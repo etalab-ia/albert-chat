@@ -19,7 +19,7 @@
 		"verify:corpus": "tsx scripts/verify-corpus.ts"
 	},
 	"dependencies": {
-		"@assistant-ui/react": "0.15.29",
+		"@assistant-ui/react": "0.15.32",
 		"@codegouvfr/react-dsfr": "^1.36.0",
 		"next": "16.4.3",
 		"react": "19.3.1",
