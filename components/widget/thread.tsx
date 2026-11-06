@@ -192,20 +192,29 @@ function PlainText({ text }: { text: string }) {
 	return <p className="whitespace-pre-line">{text}</p>;
 }
 
-function AssistantMessage() {
-	const sources = useAnswerSources();
+const NO_PART = () => null;
+const ANSWER_PARTS = {
+	Text: AnswerTextPart,
+	Source: NO_PART,
+	Image: NO_PART,
+	File: NO_PART,
+};
 
+/**
+ * The parts renderer is given module-level components so React keeps one
+ * identity per part type across renders. Defining them inline rebuilt the
+ * subtree on every streamed token.
+ */
+function AnswerTextPart({ text }: { text: string }) {
+	const sources = useAnswerSources();
+	return <AnswerText text={text} sources={sources} />;
+}
+
+function AssistantMessage() {
 	return (
 		<div className="mb-4 max-w-full">
 			<div className="text-[13px] leading-relaxed text-slate-800">
-				<MessagePrimitive.Parts
-					components={{
-						Text: (props) => <AnswerText {...props} sources={sources} />,
-						Source: () => null,
-						Image: () => null,
-						File: () => null,
-					}}
-				/>
+				<MessagePrimitive.Parts components={ANSWER_PARTS} />
 				<WaitingDots />
 			</div>
 		</div>

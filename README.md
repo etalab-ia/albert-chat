@@ -48,20 +48,20 @@ pnpm dev
 
 La page `/` simule une page intranet et charge le widget depuis `/embed`. La page `/embed` ne contient que le widget.
 
-| Commande | Effet |
-| --- | --- |
-| `pnpm dev` | serveur de développement |
-| `pnpm build` | build de production |
-| `pnpm build:widget` | bundle navigateur autonome et feuille de style du Web Component |
-| `pnpm test:browser` | tests Playwright après le build de production |
-| `pnpm lint` | Biome et règles Next.js spécifiques avec ESLint |
-| `pnpm check` | vérification Biome en mode CI |
-| `pnpm format` | formatage et corrections Biome sûres |
-| `pnpm typecheck` | TypeScript |
-| `pnpm test` | tests Vitest |
-| `pnpm ingest` | indexation initiale additive du corpus ANSSI |
-| `pnpm sync:anssi-fr` | synchronisation incrémentale de la collection française |
-| `pnpm verify:corpus` | vérifie citations et numéros de page |
+| Commande             | Effet                                                           |
+| -------------------- | --------------------------------------------------------------- |
+| `pnpm dev`           | serveur de développement                                        |
+| `pnpm build`         | build de production                                             |
+| `pnpm build:widget`  | bundle navigateur autonome et feuille de style du Web Component |
+| `pnpm test:browser`  | tests Playwright après le build de production                   |
+| `pnpm lint`          | Biome et règles Next.js spécifiques avec ESLint                 |
+| `pnpm check`         | vérification Biome en mode CI                                   |
+| `pnpm format`        | formatage et corrections Biome sûres                            |
+| `pnpm typecheck`     | TypeScript                                                      |
+| `pnpm test`          | tests Vitest                                                    |
+| `pnpm ingest`        | indexation initiale additive du corpus ANSSI                    |
+| `pnpm sync:anssi-fr` | synchronisation incrémentale de la collection française         |
+| `pnpm verify:corpus` | vérifie citations et numéros de page                            |
 
 ## Indexation du corpus
 
