@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.0](https://github.com/etalab-ia/chat-widget/compare/chat-widget-v0.2.0...chat-widget-v0.3.0) (2026-11-06)
+
+
+### Features
+
+* synchroniser incrémentalement les guides ANSSI français ([4b4aa03](https://github.com/etalab-ia/chat-widget/commit/4b4aa034aca79166f15308442feb3c1189b8b4d6))
+* synchroniser incrémentalement les guides ANSSI français ([2516b6d](https://github.com/etalab-ia/chat-widget/commit/2516b6db3d7f080b5126c7896eed387dca9931e3))
+
+
+### Bug Fixes
+
+* **lint:** adapt to Biome 2.6's new file types and promoted rules ([34e46b2](https://github.com/etalab-ia/chat-widget/commit/34e46b2f0d3bb313228b239ea30cb240dbe9a124))
+* retrouver le marqueur de fin d'indexation Albert ([5e33cc2](https://github.com/etalab-ia/chat-widget/commit/5e33cc2c69873ab0b0912bcda91d16ef2f5da40a))
+
 ## [0.2.0](https://github.com/etalab-ia/chat-widget/compare/chat-widget-v0.1.0...chat-widget-v0.2.0) (2026-10-26)
 
 
