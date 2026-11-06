@@ -7,6 +7,11 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
+    groups:
+      # One PR per weekly cycle for minor + patch bumps.
+      npm-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -14,6 +19,9 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns: ["*"]
   - package-ecosystem: "pre-commit"
     directory: "/"
     schedule:
@@ -21,6 +29,9 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
+    groups:
+      pre-commit:
+        patterns: ["*"]
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
@@ -28,3 +39,6 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 5
+    groups:
+      docker:
+        patterns: ["*"]
