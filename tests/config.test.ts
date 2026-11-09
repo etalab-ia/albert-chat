@@ -18,6 +18,21 @@ describe("loadConfig collection selection", () => {
 		expect(config.collectionIds).toEqual([30, 31, 32]);
 	});
 
+	it("ignores blank legacy variables, as left in .env.example", () => {
+		// A deployer copying .env.example sets the generic list and leaves the
+		// legacy variables present but empty. Coercing "" yields 0, which must
+		// not reject an otherwise valid configuration.
+		const config = loadConfig(
+			env({
+				ALBERT_COLLECTION_IDS: "30,31",
+				ALBERT_COLLECTION_FR: "",
+				ALBERT_COLLECTION_EN: "",
+			}),
+		);
+
+		expect(config.collectionIds).toEqual([30, 31]);
+	});
+
 	it("uses the generic list instead of the legacy variables when both exist", () => {
 		const config = loadConfig(
 			env({
