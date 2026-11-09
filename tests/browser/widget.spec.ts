@@ -24,7 +24,7 @@ test("standalone artifact renders without an iframe and contains CSS and portals
 		}),
 	);
 	await page.goto("http://127.0.0.1:4311");
-	const widget = page.locator("anssi-chat");
+	const widget = page.locator("albert-chat");
 	const trigger = widget.getByRole("button", {
 		name: "Ouvrir l'assistant ANSSI",
 	});
@@ -77,7 +77,7 @@ test("endpoint changes reject executable URLs and allow recovery", async ({
 	page,
 }) => {
 	await page.goto("http://127.0.0.1:4311");
-	const widget = page.locator("anssi-chat");
+	const widget = page.locator("albert-chat");
 	await expect(
 		widget.getByRole("button", { name: "Ouvrir l'assistant ANSSI" }),
 	).toBeVisible();
@@ -119,15 +119,15 @@ test("landing selector switches the actual integration and snippet", async ({
 	await expect(page.locator("iframe")).toHaveCount(0);
 	await expect(
 		page
-			.locator("anssi-chat")
+			.locator("albert-chat")
 			.getByRole("button", { name: "Ouvrir l'assistant ANSSI" }),
 	).toBeVisible();
-	await expect(page.locator("pre")).toContainText("<anssi-chat");
+	await expect(page.locator("pre")).toContainText("<albert-chat");
 	await page
 		.locator("label")
 		.filter({ hasText: /^Iframe$/ })
 		.click();
-	await expect(page.locator("anssi-chat")).toHaveCount(0);
+	await expect(page.locator("albert-chat")).toHaveCount(0);
 	await expect(page.locator("iframe[data-anssi-widget]")).toHaveCount(1);
 	await expect(page.locator("pre")).toContainText("embed.js");
 });
@@ -168,7 +168,7 @@ test("mobile panel fits the viewport and still accepts typing inside Shadow DOM"
 }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.goto("http://127.0.0.1:4311");
-	const widget = page.locator("anssi-chat");
+	const widget = page.locator("albert-chat");
 	await widget
 		.getByRole("button", { name: "Ouvrir l'assistant ANSSI" })
 		.click();
