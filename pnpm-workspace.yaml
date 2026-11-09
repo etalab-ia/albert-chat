@@ -15,3 +15,9 @@ allowBuilds:
   "@parcel/watcher": false
   sharp: false
   unrs-resolver: false
+
+# GHSA-g3hv-75wg-m249 / CVE-2026-118764 (minimatch < 11.0.1 DoS). 11.0.4 is the
+# newest patched release past the 7-day release-age gate as of 2026-11-09;
+# minimatch is a transitive dep only (via @typescript-eslint/typescript-estree).
+overrides:
+  minimatch: 11.0.4
