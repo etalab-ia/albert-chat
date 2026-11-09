@@ -109,7 +109,7 @@ Le workflow `anssi-sync.yml` exécute cette commande chaque jour à 04:17 UTC et
 L'application est un Next.js standard (App Router). Elle exige :
 
 - `ALBERT_API_KEY` côté serveur ;
-- `ALBERT_COLLECTION_FR` et `ALBERT_COLLECTION_EN` ;
+- `ALBERT_COLLECTION_IDS`, la liste des collections interrogées, séparées par des virgules (`ALBERT_COLLECTION_FR` et `ALBERT_COLLECTION_EN` restent acceptées pour le démonstrateur ANSSI) ;
 - éventuellement `ALBERT_CHAT_MODEL` (par défaut `gpt-oss-120b`) ;
 - éventuellement `EMBED_ALLOWED_PARENTS`, la liste des origines autorisées à afficher `/embed` dans une iframe (voir « Intégration dans une page hôte »). Vide, seule la page `/` du service peut l'afficher.
 
