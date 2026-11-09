@@ -11,8 +11,9 @@
  *   pnpm check:config -- --env-file .env.production
  */
 import { AlbertClient } from "../lib/albert/client";
+import type { SearchHit } from "../lib/albert/types";
 import { type AppConfig, loadConfig } from "../lib/config";
-import { toCitations } from "../lib/rag/citations";
+import { blocksToSources, buildContextBlocks } from "../lib/rag/citations";
 import { readSetting, requireSetting } from "./lib/env";
 
 const PROBES = ["procédure", "comment faire une demande", "responsabilité"];
@@ -43,21 +44,27 @@ export async function checkCollection({
 
 	for (const probe of PROBES) {
 		try {
-			const hits = await search({
+			const hits = (await search({
 				query: probe,
 				collectionIds: [collectionId],
 				limit: 5,
 				method: "hybrid",
-			});
-			if (hits.length === 0) continue;
+			})) as SearchHit[];
+
+			// Judge the hits by the runtime's own criteria: buildContextBlocks is
+			// what /api/chat feeds the model, and it drops empty or unsafe chunks.
+			// Counting raw hits reported success for collections that supply no
+			// usable context at all.
+			const blocks = buildContextBlocks(hits);
+			if (blocks.length === 0) continue;
 
 			answered += 1;
 			if (answered === 1) {
-				const citations = toCitations(hits as never);
+				const citations = blocksToSources(blocks);
 				const linked = citations.filter((citation) => citation.url !== null);
 				const paged = citations.filter((citation) => citation.page !== null);
 				lines.push(
-					`     first probe: ${hits.length} hit(s), ${linked.length} linkable, ${paged.length} with a page`,
+					`     first probe: ${blocks.length} usable excerpt(s), ${linked.length} linkable, ${paged.length} with a page`,
 				);
 			}
 		} catch (error) {
@@ -69,13 +76,13 @@ export async function checkCollection({
 		lines.unshift(
 			lastError
 				? `FAIL collection ${collectionId}: search failed (${lastError})`
-				: `FAIL collection ${collectionId}: no probe returned content; the collection may be empty or still indexing`,
+				: `FAIL collection ${collectionId}: no probe returned usable excerpts; the collection may be empty, still indexing, or hold chunks the widget cannot cite`,
 		);
 		return { ok: false, lines };
 	}
 
 	lines.unshift(
-		`OK   collection ${collectionId}: answered ${answered}/${PROBES.length} probes`,
+		`OK   collection ${collectionId}: ${answered}/${PROBES.length} probes returned citable excerpts`,
 	);
 	return { ok: true, lines };
 }

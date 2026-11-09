@@ -23,13 +23,46 @@ const CONFIG: AppConfig = {
 };
 
 describe("checkCollection", () => {
-	it("passes when a probe returns content", async () => {
+	it("passes when a probe returns citable content", async () => {
 		const search = vi.fn().mockResolvedValue([HIT]);
 		const result = await checkCollection({ search, collectionId: 30 });
 
 		expect(result.ok).toBe(true);
-		expect(result.lines[0]).toContain("answered 3/3 probes");
+		expect(result.lines[0]).toContain("3/3 probes returned citable excerpts");
 		expect(result.lines.join("\n")).toContain("1 linkable, 1 with a page");
+	});
+
+	it("fails when hits carry no usable content", async () => {
+		// buildContextBlocks drops blank chunks, so the widget would receive no
+		// context even though the collection returns hits.
+		const search = vi
+			.fn()
+			.mockResolvedValue([{ ...HIT, chunk: { ...HIT.chunk, content: "   " } }]);
+		const result = await checkCollection({ search, collectionId: 30 });
+
+		expect(result.ok).toBe(false);
+		expect(result.lines[0]).toContain("no probe returned usable excerpts");
+	});
+
+	it("fails when a malformed hit breaks citation building", async () => {
+		const search = vi
+			.fn()
+			.mockResolvedValue([{ ...HIT, chunk: undefined } as never]);
+		const result = await checkCollection({ search, collectionId: 30 });
+
+		expect(result.ok).toBe(false);
+	});
+
+	it("counts only probes the runtime can actually ground on", async () => {
+		// One usable probe out of three must not read as a full success.
+		const search = vi
+			.fn()
+			.mockResolvedValueOnce([HIT])
+			.mockResolvedValue([{ ...HIT, chunk: { ...HIT.chunk, content: "" } }]);
+		const result = await checkCollection({ search, collectionId: 30 });
+
+		expect(result.ok).toBe(true);
+		expect(result.lines[0]).toContain("1/3 probes");
 	});
 
 	it("fails when every probe is empty", async () => {
@@ -37,7 +70,7 @@ describe("checkCollection", () => {
 		const result = await checkCollection({ search, collectionId: 30 });
 
 		expect(result.ok).toBe(false);
-		expect(result.lines[0]).toContain("no probe returned content");
+		expect(result.lines[0]).toContain("no probe returned usable excerpts");
 	});
 
 	it("reports the upstream error when the credential is rejected", async () => {
