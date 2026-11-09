@@ -21,6 +21,10 @@ concurrency:
 jobs:
   synchronize:
     name: Synchronize Albert collection
+    # This job only ever writes to the ANSSI corpus. On a fork it would either
+    # fail noisily or, where ALBERT_API_KEY is set for the fork's own corpus,
+    # succeed and index the whole ANSSI catalogue into the fork owner's tenant.
+    if: github.repository == 'etalab-ia/chat-widget'
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     env:

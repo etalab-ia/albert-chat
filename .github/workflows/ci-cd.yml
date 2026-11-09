@@ -71,21 +71,34 @@ jobs:
       SCW_SECRET_KEY: ${{ secrets.SCW_SECRET_KEY }}
       SCW_ORGANIZATION_ID: ${{ secrets.SCW_ORGANIZATION_ID }}
       SCW_PROJECT_ID: ${{ secrets.SCW_PROJECT_ID }}
-      SCW_REGION: fr-par
-      SCW_CONTAINER_ID: b9982545-2521-4a9b-ad40-653a9b6928ea
-      SCW_NAMESPACE_ID: f4e894a6-4667-4eb5-b430-de66adb9db06
-      REGISTRY_HOST: rg.fr-par.scw.cloud
-      IMAGE_REFERENCE: rg.fr-par.scw.cloud/chat-widget/chat-widget:sha-${{ github.sha }}
+      SCW_REGION: ${{ vars.SCW_REGION || 'fr-par' }}
+      # The deployment target is a repository variable so a fork configures
+      # itself without editing this file. The fallback is this deployment's own
+      # id, so nothing changes here until the variable is set. Same for the
+      # namespace and the registry path. See "Déployer son propre widget" in
+      # the README for the full list.
+      SCW_CONTAINER_ID: ${{ vars.SCW_CONTAINER_ID || 'b9982545-2521-4a9b-ad40-653a9b6928ea' }}
+      SCW_NAMESPACE_ID: ${{ vars.SCW_NAMESPACE_ID || 'f4e894a6-4667-4eb5-b430-de66adb9db06' }}
+      IMAGE_BASE: ${{ vars.SCW_IMAGE_BASE || 'rg.fr-par.scw.cloud/chat-widget/chat-widget' }}
+      IMAGE_REFERENCE: ${{ vars.SCW_IMAGE_BASE || 'rg.fr-par.scw.cloud/chat-widget/chat-widget' }}:sha-${{ github.sha }}
+      REGISTRY_HOST: ${{ vars.SCW_REGISTRY_HOST || 'rg.fr-par.scw.cloud' }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Check Scaleway configuration
         run: |
+          set -euo pipefail
           test -n "$SCW_ACCESS_KEY"
           test -n "$SCW_SECRET_KEY"
           test -n "$SCW_ORGANIZATION_ID"
           test -n "$SCW_PROJECT_ID"
+          # Print what actually resolved. A fork that sets none of the variables
+          # would otherwise fail later against this deployment's ids, with an
+          # error that points at credentials instead of at the missing settings.
+          echo "Container: $SCW_CONTAINER_ID"
+          echo "Namespace: $SCW_NAMESPACE_ID"
+          echo "Image:     $IMAGE_REFERENCE"
 
       - name: Set up Scaleway CLI
         uses: scaleway/action-scw@2e34a1eb35cf3cac627f24643a101fea269cbd83 # v0.0.3

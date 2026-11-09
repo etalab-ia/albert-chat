@@ -151,6 +151,50 @@ La commande valide la configuration avec le même code que le widget, puis véri
 - **Mise à jour du corpus.** Les documents peuvent changer sans redéployer le widget. En revanche, changer la liste des collections ou les variables d'environnement demande un redéploiement.
 - **Liste vide.** Une liste de collections vide est refusée au démarrage : l'API Albert interpréterait une liste vide comme « toutes les collections accessibles ».
 
+### Déployer son propre widget
+
+Cette section est la liste de contrôle pour un fork. L'ordre compte : le corpus et sa vérification viennent avant le premier déploiement, sinon le widget se déploie sur une configuration qui échouera à la première question.
+
+**1. Préparer les collections** dans le dépôt du projet, avec ses propres scripts d'ingestion, puis relever leurs identifiants.
+
+**2. Vérifier avant de déployer :**
+
+```bash
+git clone <votre fork>
+cd chat-widget && pnpm install
+ALBERT_API_KEY=… ALBERT_COLLECTION_IDS=… pnpm check:config
+```
+
+La commande est en lecture seule et n'écrit rien dans Albert. Elle échoue si la clé est refusée, si un identifiant est faux, ou si une collection ne renvoie aucun extrait citable.
+
+**3. Créer le conteneur** dans votre espace Scaleway, puis relever son identifiant, celui de la ressource de conteneurs (_namespace_), et le chemin d'image dans votre registre.
+
+**4. Renseigner les secrets et les variables** du dépôt (Settings → Secrets and variables → Actions) :
+
+| Secret                                  | Contenu            |
+| --------------------------------------- | ------------------ |
+| `ALBERT_API_KEY`                        | clé du projet      |
+| `SCW_ACCESS_KEY`, `SCW_SECRET_KEY`      | clé d'API Scaleway |
+| `SCW_ORGANIZATION_ID`, `SCW_PROJECT_ID` | portée de la clé   |
+
+| Variable            | Rôle                                | Si absente                                    |
+| ------------------- | ----------------------------------- | --------------------------------------------- |
+| `SCW_CONTAINER_ID`  | conteneur à mettre à jour           | celui du démonstrateur ANSSI                  |
+| `SCW_NAMESPACE_ID`  | espace de conteneurs                | celui du démonstrateur ANSSI                  |
+| `SCW_IMAGE_BASE`    | chemin d'image complet, sans le tag | `rg.fr-par.scw.cloud/chat-widget/chat-widget` |
+| `SCW_REGISTRY_HOST` | hôte du registre                    | `rg.fr-par.scw.cloud`                         |
+| `SCW_REGION`        | région Scaleway                     | `fr-par`                                      |
+
+Chaque valeur a pour repli celle du démonstrateur, pour que ce dépôt continue de se déployer sans configuration supplémentaire. **Sur un fork, renseigner les cinq variables** : sans elles, le déploiement s'arrête à l'étape « Verify the Scaleway project and container », dont le message évoque les identifiants alors que le problème est l'identifiant du conteneur. L'étape « Check Scaleway configuration » affiche les valeurs retenues, ce qui rend l'erreur lisible.
+
+**5. Configurer l'environnement du conteneur** : `ALBERT_API_KEY`, `ALBERT_COLLECTION_IDS`, et le cas échéant `ALBERT_BASE_URL`, `ALBERT_CHAT_MODEL`, `EMBED_ALLOWED_PARENTS`, `WIDGET_ALLOWED_ORIGINS`. Voir « Déploiement » et « Intégration dans une page hôte ».
+
+**6. Pousser sur `main`.** Le pipeline exécute lint, types, tests et build, puis construit et publie l'image, met à jour le conteneur et vérifie `/`, `/embed`, `/embed.js`, `/widget.js` et `/widget.css`.
+
+Deux workflows ne concernent que le démonstrateur et n'ont pas à être activés sur un fork : la synchronisation quotidienne du corpus ANSSI, déjà neutralisée hors du dépôt d'origine, et release-please, qui suppose un historique de versions à maintenir.
+
+**Reste à décider** : le nom de l'élément personnalisé (`<anssi-chat>`) et les libellés « Assistant ANSSI » sont propres au démonstrateur. Les changer est une rupture pour une page hôte qui les utilise déjà, donc ce point est laissé à chaque projet plutôt que modifié ici.
+
 ## Déploiement
 
 L'application est un Next.js standard (App Router). Elle exige :
