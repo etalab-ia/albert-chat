@@ -20,7 +20,7 @@ function apiUrlFor(value: string | null): string {
 }
 
 /** Direct React integration. Shadow DOM contains CSS, not security privileges. */
-export class AnssiChat extends HTMLElement {
+export class AlbertChat extends HTMLElement {
 	static observedAttributes = ["api-url"];
 	#root: Root | null = null;
 	#lifetime: AbortController | null = null;
@@ -117,5 +117,8 @@ export class AnssiChat extends HTMLElement {
 	}
 }
 
-if (!customElements.get("anssi-chat"))
-	customElements.define("anssi-chat", AnssiChat);
+/** The tag a host page writes. Renaming it is a breaking change for embedders. */
+export const WIDGET_TAG = "albert-chat";
+
+if (!customElements.get(WIDGET_TAG))
+	customElements.define(WIDGET_TAG, AlbertChat);

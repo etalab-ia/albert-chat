@@ -144,6 +144,8 @@ pnpm check:config -- --env-file .env.production
 
 La commande valide la configuration avec le même code que le widget, puis vérifie que la clé atteint chaque collection et qu'elle renvoie du contenu citable. Elle est strictement en lecture seule : elle n'appelle que `/v1/search`, sans création, modification ni suppression. Elle échoue si la configuration est invalide, si la clé est refusée ou si une collection ne renvoie rien.
 
+Un succès prouve le câblage, pas l'adéquation du corpus : voir « Ce que `check:config` vérifie, et ce qu'il ne vérifie pas » plus bas.
+
 ### Points à décider avant la mise en ligne
 
 - **Public visé.** Le widget n'a pas d'authentification : toute personne qui connaît l'URL peut interroger le corpus, dans la limite des plafonds. Le rendre public est une décision de publication, pas un effet de bord du déploiement.
@@ -193,7 +195,13 @@ Chaque valeur a pour repli celle du démonstrateur, pour que ce dépôt continue
 
 Deux workflows ne concernent que le démonstrateur et n'ont pas à être activés sur un fork : la synchronisation quotidienne du corpus ANSSI, déjà neutralisée hors du dépôt d'origine, et release-please, qui suppose un historique de versions à maintenir.
 
-**Reste à décider** : le nom de l'élément personnalisé (`<anssi-chat>`) et les libellés « Assistant ANSSI » sont propres au démonstrateur. Les changer est une rupture pour une page hôte qui les utilise déjà, donc ce point est laissé à chaque projet plutôt que modifié ici.
+L'élément personnalisé s'appelle `<albert-chat>` pour tous les projets : le nom ne mentionne plus un corpus particulier. Les libellés visibles (« Assistant ANSSI », les suggestions de départ) restent propres au démonstrateur et se modifient dans `components/widget/` ; un fork les adapte à son corpus.
+
+### Ce que `check:config` vérifie, et ce qu'il ne vérifie pas
+
+La commande établit que la clé est acceptée, que chaque identifiant de collection existe et que les chunks renvoyés contiennent du texte citable. Elle ne dit rien de la qualité du corpus.
+
+La recherche hybride d'Albert renvoie des résultats pour n'importe quelle requête, y compris hors sujet : le widget n'applique aucun seuil de score. Une collection sans rapport avec les questions posées passera donc le contrôle. Pour juger de l'adéquation, interroger le widget lui-même avec quelques questions réelles — si les extraits ne couvrent pas le sujet, la réponse le dit explicitement plutôt que d'inventer, ce qui est le comportement attendu mais ne remplace pas un corpus adapté.
 
 ## Déploiement
 
@@ -229,7 +237,7 @@ La liste des parents est volontairement limitée à des origines nues : une entr
 
 ```html
 <script type="module" src="https://<hote>/widget.js"></script>
-<anssi-chat api-url="https://<hote>/api/chat"></anssi-chat>
+<albert-chat api-url="https://<hote>/api/chat"></albert-chat>
 ```
 
 Le navigateur n'a besoin d'aucun framework installé : `widget.js` embarque React, ReactDOM et assistant-ui, sans Next.js ni DSFR. Il charge `widget.css` à côté de son propre fichier et place le panneau et ses styles dans un Shadow DOM. Les deux fichiers et `widget.js.LEGAL.txt` sont générés par `pnpm dev` et `pnpm build`, puis inclus dans l'image. Pour les auto-héberger, copier ces trois fichiers ensemble, conserver les mentions de licence et renseigner explicitement `api-url` vers le serveur du service. Sans attribut, l'API est `/api/chat` sur l'origine du script.

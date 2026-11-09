@@ -12,16 +12,16 @@ type IntegrationMode = "iframe" | "web-component";
 const IFRAME_SNIPPET = `<script src="https://<votre-hote>/embed.js" referrerpolicy="strict-origin-when-cross-origin" defer></script>`;
 
 const WEB_COMPONENT_SNIPPET = `<script type="module" src="https://<votre-hote>/widget.js"></script>
-<anssi-chat api-url="https://<votre-hote>/api/chat"></anssi-chat>`;
+<albert-chat api-url="https://<votre-hote>/api/chat"></albert-chat>`;
 
 /** Custom element registered by the public `/widget.js` module. */
-const WIDGET_TAG = "anssi-chat";
+const WIDGET_TAG = "albert-chat";
 const WIDGET_SCRIPT_SRC = "/widget.js";
 /** Marks the module tag this page appends, so a remount reuses it. */
 const WIDGET_SCRIPT_FLAG = "data-anssi-widget-module";
 
 /**
- * Resolves once `/widget.js` has registered `<anssi-chat>`. Module-level so the
+ * Resolves once `/widget.js` has registered `<albert-chat>`. Module-level so the
  * script stays loaded across mode switches: a later switch reuses the
  * definition instead of fetching the bundle again.
  */
