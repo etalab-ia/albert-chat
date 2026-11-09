@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.0](https://github.com/etalab-ia/chat-widget/compare/chat-widget-v0.4.0...chat-widget-v0.5.0) (2026-11-09)
+
+
+### Features
+
+* **ci:** make the workflows safe and configurable for forks ([f3b8f4c](https://github.com/etalab-ia/chat-widget/commit/f3b8f4c56f06f2eaa2607604c230bf62e3893e83))
+* **ci:** make the workflows safe and configurable for forks ([fa3ed2b](https://github.com/etalab-ia/chat-widget/commit/fa3ed2b24cdd7a932474ae886d51ce8680368f93))
+
 ## [0.4.0](https://github.com/etalab-ia/chat-widget/compare/chat-widget-v0.3.0...chat-widget-v0.4.0) (2026-11-09)
 
 
