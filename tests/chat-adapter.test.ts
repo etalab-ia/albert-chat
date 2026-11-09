@@ -209,6 +209,23 @@ describe("citationsToParts", () => {
 		]);
 		expect(part).toMatchObject({ type: "source", title: "Guide" });
 	});
+	it("represents an excerpt-only source without a navigable URL", () => {
+		const [part] = citationsToParts([
+			{
+				id: "10-20-3",
+				title: "Note interne",
+				page: null,
+				url: null,
+				score: 0.1,
+			},
+		]);
+		expect(part).toMatchObject({
+			type: "source",
+			id: "10-20-3",
+			url: "",
+			title: "Note interne",
+		});
+	});
 });
 
 describe("runChat stream decoding", () => {

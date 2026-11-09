@@ -5,7 +5,8 @@ export type Citation = {
 	id: string;
 	title: string;
 	page: number | null;
-	url: string;
+	/** Null when the corpus supplies no safe URL; the excerpt remains citable. */
+	url: string | null;
 	score: number;
 };
 
@@ -37,58 +38,91 @@ export function buildCitationUrl(
 	return `${base}#${fragment}&page=${page}`;
 }
 
-function readPage(metadata: ChunkMetadata | null | undefined): number | null {
-	const page = metadata?.page;
-	if (typeof page === "number" && Number.isFinite(page) && page > 0) {
-		return Math.trunc(page);
+function parsePage(value: unknown): number | null {
+	if (typeof value === "number" && Number.isSafeInteger(value) && value > 0) {
+		return value;
 	}
-	if (typeof page === "string") {
-		const parsed = Number.parseInt(page, 10);
-		return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+	if (typeof value === "string" && /^[1-9]\d*$/.test(value)) {
+		const parsed = Number(value);
+		return Number.isSafeInteger(parsed) ? parsed : null;
 	}
 	return null;
 }
 
-/**
- * Only absolute http(s) sources are rendered as links. `/v1/search` returns
- * whatever metadata was indexed, and a `javascript:` URL would become a
- * clickable script in the page the widget is embedded in.
- */
-function isSafeSourceUrl(value: string): boolean {
-	return /^https?:\/\//i.test(value);
+/** Accepts the generic provenance name and the ANSSI pipeline's legacy field. */
+function readPage(metadata: ChunkMetadata | null | undefined): number | null {
+	return parsePage(metadata?.page_number) ?? parsePage(metadata?.page);
+}
+
+function readTitle(hit: SearchHit): string {
+	const metadata = hit.chunk.metadata ?? {};
+	for (const candidate of [metadata.title, metadata.guide_title]) {
+		if (typeof candidate === "string" && candidate.trim().length > 0) {
+			return candidate.trim();
+		}
+	}
+	return `Document ${hit.chunk.document_id}`;
 }
 
 /**
- * Turns raw search hits into numbered citations. Hits without a source URL are
- * dropped: a citation that cannot be opened is worse than no citation.
+ * Only absolute http(s) sources become links. Unsafe or absent URLs do not
+ * discard the chunk: its content can still ground an answer safely.
  */
+function readSourceUrl(metadata: ChunkMetadata): string | null {
+	const sourceUrl = metadata.source_url;
+	if (typeof sourceUrl !== "string") return null;
+	const trimmed = sourceUrl.trim();
+	return /^https?:\/\//i.test(trimmed) ? trimmed : null;
+}
+
+function sourceKey(hit: SearchHit, page: number | null, url: string | null) {
+	const {
+		collection_id: collectionId,
+		document_id: documentId,
+		id,
+	} = hit.chunk;
+	// Without page provenance, merging chunks would truncate unrelated passages
+	// at the block size limit. Keep each chunk addressable instead.
+	if (page === null)
+		return JSON.stringify(["chunk", collectionId, documentId, id]);
+	return JSON.stringify(
+		url === null
+			? ["document-page", collectionId, documentId, page]
+			: ["url-page", url],
+	);
+}
+
+function describeHit(hit: SearchHit) {
+	const metadata = hit.chunk.metadata ?? {};
+	const page = readPage(metadata);
+	const sourceUrl = readSourceUrl(metadata);
+	const url = sourceUrl === null ? null : buildCitationUrl(sourceUrl, page);
+	return {
+		id: `${hit.chunk.collection_id}-${hit.chunk.document_id}-${hit.chunk.id}`,
+		title: readTitle(hit),
+		page,
+		url,
+		key: sourceKey(hit, page, url),
+	};
+}
+
+/** Turns raw search hits into numbered citations, with or without links. */
 export function toCitations(hits: SearchHit[]): Citation[] {
 	const byKey = new Map<string, Citation>();
 
 	for (const hit of hits) {
-		const metadata = hit.chunk.metadata ?? {};
-		const sourceUrl = metadata.source_url;
-		if (typeof sourceUrl !== "string" || sourceUrl.length === 0) continue;
-		if (!isSafeSourceUrl(sourceUrl)) continue;
-
-		const page = readPage(metadata);
-		const title =
-			typeof metadata.guide_title === "string" && metadata.guide_title
-				? metadata.guide_title
-				: "Document ANSSI";
-
-		const key = `${sourceUrl}#${page ?? ""}`;
-		const existing = byKey.get(key);
+		const source = describeHit(hit);
+		const existing = byKey.get(source.key);
 		if (existing) {
 			existing.score = Math.max(existing.score, hit.score);
 			continue;
 		}
 
-		byKey.set(key, {
-			id: `${hit.chunk.document_id}-${hit.chunk.id}`,
-			title,
-			page,
-			url: buildCitationUrl(sourceUrl, page),
+		byKey.set(source.key, {
+			id: source.id,
+			title: source.title,
+			page: source.page,
+			url: source.url,
 			score: hit.score,
 		});
 	}
@@ -110,17 +144,11 @@ export function buildContextBlocks(hits: SearchHit[]): ContextBlock[] {
 	const blockByKey = new Map<string, ContextBlock>();
 
 	for (const hit of hits) {
-		const metadata = hit.chunk.metadata ?? {};
-		const sourceUrl = metadata.source_url;
-		if (typeof sourceUrl !== "string" || sourceUrl.length === 0) continue;
-		if (!isSafeSourceUrl(sourceUrl)) continue;
-
-		const page = readPage(metadata);
 		const content = hit.chunk.content.trim();
 		if (content.length === 0) continue;
 
-		const key = buildCitationUrl(sourceUrl, page);
-		const existing = blockByKey.get(key);
+		const source = describeHit(hit);
+		const existing = blockByKey.get(source.key);
 
 		if (existing) {
 			if (existing.content.length < LIMITS.maxChunkCharacters) {
@@ -132,25 +160,20 @@ export function buildContextBlocks(hits: SearchHit[]): ContextBlock[] {
 			continue;
 		}
 
-		const title =
-			typeof metadata.guide_title === "string" && metadata.guide_title
-				? metadata.guide_title
-				: "Document ANSSI";
-
 		const block: ContextBlock = {
 			marker: `[${blocks.length + 1}]`,
 			citation: {
-				id: `${hit.chunk.document_id}-${hit.chunk.id}`,
-				title,
-				page,
-				url: key,
+				id: source.id,
+				title: source.title,
+				page: source.page,
+				url: source.url,
 				score: hit.score,
 			},
 			content: content.slice(0, LIMITS.maxChunkCharacters),
 		};
 
 		blocks.push(block);
-		blockByKey.set(key, block);
+		blockByKey.set(source.key, block);
 	}
 
 	return blocks;

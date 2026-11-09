@@ -7,6 +7,15 @@ const envSchema = z.object({
 		.url()
 		.default("https://albert.api.etalab.gouv.fr"),
 	ALBERT_CHAT_MODEL: z.string().default("gpt-oss-120b"),
+	ALBERT_COLLECTION_IDS: z.string().optional(),
+});
+
+/**
+ * The ANSSI-era variables are validated separately: `z.coerce.number()` turns an
+ * empty string into `0`, so validating them up front rejected the documented
+ * setup of setting only the generic list and leaving these blank.
+ */
+const legacyCollectionSchema = z.object({
 	ALBERT_COLLECTION_FR: z.coerce.number().int().positive().optional(),
 	ALBERT_COLLECTION_EN: z.coerce.number().int().positive().optional(),
 });
@@ -18,6 +27,31 @@ export type AppConfig = {
 	collectionIds: number[];
 };
 
+function formatIssues(error: z.ZodError): string {
+	return error.issues
+		.map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+		.join("; ");
+}
+
+/** Parses the generic collection list, rejecting partial or lossy numeric IDs. */
+function parseCollectionIds(raw: string): number[] {
+	const entries = raw.split(",").map((entry) => entry.trim());
+	if (entries.some((entry) => !/^[1-9]\d*$/.test(entry))) {
+		throw new Error(
+			"Invalid server configuration (ALBERT_COLLECTION_IDS must be a comma-separated list of positive integers)",
+		);
+	}
+
+	const ids = entries.map(Number);
+	if (ids.some((id) => !Number.isSafeInteger(id))) {
+		throw new Error(
+			"Invalid server configuration (ALBERT_COLLECTION_IDS contains an unsafe integer)",
+		);
+	}
+
+	return [...new Set(ids)];
+}
+
 /**
  * Reads and validates the server configuration. Throws a readable error listing
  * the offending variables rather than failing later inside a request.
@@ -26,20 +60,38 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
 	const parsed = envSchema.safeParse(env);
 
 	if (!parsed.success) {
-		const issues = parsed.error.issues
-			.map((issue) => `${issue.path.join(".")}: ${issue.message}`)
-			.join("; ");
-		throw new Error(`Invalid server configuration (${issues})`);
+		throw new Error(
+			`Invalid server configuration (${formatIssues(parsed.error)})`,
+		);
 	}
 
-	const collectionIds = [
-		parsed.data.ALBERT_COLLECTION_FR,
-		parsed.data.ALBERT_COLLECTION_EN,
-	].filter((id): id is number => typeof id === "number");
+	// The generic list replaces the ANSSI-era variables when present. An empty
+	// value is an error, not a fallback: searching every accessible collection
+	// would expose corpora the deployer did not explicitly select.
+	let collectionIds: number[];
+	if (parsed.data.ALBERT_COLLECTION_IDS === undefined) {
+		const legacy = legacyCollectionSchema.safeParse(env);
+		if (!legacy.success) {
+			throw new Error(
+				`Invalid server configuration (${formatIssues(legacy.error)})`,
+			);
+		}
+
+		collectionIds = [
+			...new Set(
+				[
+					legacy.data.ALBERT_COLLECTION_FR,
+					legacy.data.ALBERT_COLLECTION_EN,
+				].filter((id): id is number => typeof id === "number"),
+			),
+		];
+	} else {
+		collectionIds = parseCollectionIds(parsed.data.ALBERT_COLLECTION_IDS);
+	}
 
 	if (collectionIds.length === 0) {
 		throw new Error(
-			"Invalid server configuration (set ALBERT_COLLECTION_FR and/or ALBERT_COLLECTION_EN)",
+			"Invalid server configuration (set ALBERT_COLLECTION_IDS, or ALBERT_COLLECTION_FR and/or ALBERT_COLLECTION_EN)",
 		);
 	}
 

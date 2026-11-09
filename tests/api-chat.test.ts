@@ -67,6 +67,7 @@ beforeEach(() => {
 	process.env.ALBERT_API_KEY = "sk-test";
 	process.env.ALBERT_COLLECTION_FR = "10";
 	process.env.ALBERT_COLLECTION_EN = "11";
+	delete process.env.ALBERT_COLLECTION_IDS;
 	delete process.env.ALBERT_CHAT_MODEL;
 });
 
@@ -128,6 +129,29 @@ describe("POST /api/chat", () => {
 
 		expect(answer).toBe("La MFA est requise [1].");
 		expect(answer).not.toContain("reflechis");
+	});
+
+	it("sends the configured generic collection set to Albert", async () => {
+		process.env.ALBERT_COLLECTION_IDS = "30,31,30";
+		let searchBody: { collection_ids?: number[] } | undefined;
+		vi.stubGlobal(
+			"fetch",
+			vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+				if (String(url).endsWith("/v1/search")) {
+					searchBody = JSON.parse(String(init?.body));
+					return Promise.resolve(Response.json({ data: [] }));
+				}
+				return Promise.resolve(
+					new Response(sseBody(["data: [DONE]\n\n"]), { status: 200 }),
+				);
+			}),
+		);
+
+		const { POST } = await import("@/app/api/chat/route");
+		const response = await POST(postRequest({ question: "Projet ?" }));
+		await readEvents(response);
+
+		expect(searchBody?.collection_ids).toEqual([30, 31]);
 	});
 
 	it("emits one source per cited page so marker N addresses source N", async () => {

@@ -9,7 +9,18 @@ test("standalone artifact renders without an iframe and contains CSS and portals
 		route.fulfill({
 			contentType: "application/x-ndjson",
 			headers: { "Access-Control-Allow-Origin": "http://127.0.0.1:4311" },
-			body: `${JSON.stringify({ type: "sources", sources: [{ id: "1", title: "Guide", url: "https://example.org/guide.pdf#page=2", page: 2 }] })}\n${JSON.stringify({ type: "delta", text: "Réponse sûre <script>alert(1)</script> [1]." })}\n{"type":"done"}\n`,
+			body: `${JSON.stringify({
+				type: "sources",
+				sources: [
+					{
+						id: "1",
+						title: "Guide",
+						url: "https://example.org/guide.pdf#page=2",
+						page: 2,
+					},
+					{ id: "2", title: "Note interne", url: null, page: null },
+				],
+			})}\n${JSON.stringify({ type: "delta", text: "Réponse sûre <script>alert(1)</script> [1][2]." })}\n{"type":"done"}\n`,
 		}),
 	);
 	await page.goto("http://127.0.0.1:4311");
@@ -40,6 +51,10 @@ test("standalone artifact renders without an iframe and contains CSS and portals
 		"https://example.org/guide.pdf#page=2",
 	);
 	await expect(citation).toHaveAttribute("rel", "noopener noreferrer");
+	const excerptCitation = widget.getByTitle("Source 2, le document cité");
+	await expect(excerptCitation).toBeVisible();
+	await expect(excerptCitation).not.toHaveAttribute("href");
+	await expect(widget.getByRole("link", { name: /^Source / })).toHaveCount(1);
 	expect(
 		await page.evaluate(
 			() =>

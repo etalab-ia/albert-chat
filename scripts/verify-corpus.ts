@@ -6,7 +6,11 @@
  */
 import { AlbertClient } from "../lib/albert/client";
 import { loadConfig } from "../lib/config";
-import { buildCitationUrl, toCitations } from "../lib/rag/citations";
+import {
+	buildCitationUrl,
+	type Citation,
+	toCitations,
+} from "../lib/rag/citations";
 
 const PROBES = [
 	"recommandations de sécurité réseau",
@@ -41,11 +45,14 @@ async function main() {
 			}
 
 			const citations = toCitations(hits);
-			const withPage = citations.filter((citation) => citation.page !== null);
+			const withPage = citations.filter(
+				(citation): citation is Citation & { page: number; url: string } =>
+					citation.page !== null && citation.url !== null,
+			);
 
 			if (withPage.length === 0) {
 				console.log(
-					`  "${probe}": ${hits.length} résultats, aucun numéro de page`,
+					`  "${probe}": ${hits.length} résultats, aucun numéro de page avec URL`,
 				);
 				problems += 1;
 				continue;

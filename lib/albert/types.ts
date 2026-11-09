@@ -1,12 +1,16 @@
 /** Wire types for the subset of the Albert API used by this POC. */
 
 export type ChunkMetadata = {
+	/** Generic display title; `guide_title` remains the ANSSI compatibility field. */
+	title?: string;
 	guide_id?: string;
 	guide_title?: string;
 	source_url?: string;
 	source_sha256?: string;
 	/** Written on every new chunk; only the final chunk marks ingestion complete. */
 	sync_complete?: boolean;
+	/** Generic page provenance; `page` remains the ANSSI compatibility field. */
+	page_number?: number;
 	page?: number;
 	updated?: string;
 	collection?: string;
