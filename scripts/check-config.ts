@@ -10,13 +10,79 @@
  *   pnpm check:config
  *   pnpm check:config -- --env-file .env.production
  */
+import { readFileSync } from "node:fs";
 import { AlbertClient } from "../lib/albert/client";
 import type { SearchHit } from "../lib/albert/types";
 import { type AppConfig, loadConfig } from "../lib/config";
 import { blocksToSources, buildContextBlocks } from "../lib/rag/citations";
-import { readSetting, requireSetting } from "./lib/env";
+import { requireSetting } from "./lib/env";
 
 const PROBES = ["procédure", "comment faire une demande", "responsabilité"];
+
+/** Every variable `loadConfig()` reads, and therefore every one worth resolving. */
+const CONFIG_VARIABLES = [
+	"ALBERT_API_KEY",
+	"ALBERT_BASE_URL",
+	"ALBERT_CHAT_MODEL",
+	"ALBERT_COLLECTION_IDS",
+	"ALBERT_COLLECTION_FR",
+	"ALBERT_COLLECTION_EN",
+] as const;
+
+/**
+ * Reads a variable while distinguishing "absent" from "present but empty".
+ *
+ * `readSetting()` collapses both into `undefined`, which is right for the
+ * ingestion scripts but wrong here: an explicitly empty `ALBERT_BASE_URL` is a
+ * configuration error the widget rejects, so the check must not paper over it
+ * with a fallback the runtime never applies.
+ */
+export function readRawSetting(
+	name: string,
+	envFile?: string,
+): { present: boolean; value: string } {
+	if (envFile) {
+		const content = readFileSync(envFile, "utf8");
+		for (const rawLine of content.split("\n")) {
+			const line = rawLine.trim();
+			if (!line || line.startsWith("#")) continue;
+			const separator = line.indexOf("=");
+			if (separator === -1) continue;
+			if (line.slice(0, separator).trim() !== name) continue;
+			return {
+				present: true,
+				value: line
+					.slice(separator + 1)
+					.trim()
+					.replace(/^["']|["']$/g, ""),
+			};
+		}
+	}
+
+	const fromEnv = process.env[name];
+	return fromEnv === undefined
+		? { present: false, value: "" }
+		: { present: true, value: fromEnv };
+}
+
+/**
+ * Builds the environment to validate.
+ *
+ * Without `--env-file` this is the process environment untouched, so the check
+ * sees exactly what `/api/chat` sees. With one, the file's values are layered
+ * over it, including empty ones, and anything the file omits still resolves
+ * from the process environment.
+ */
+export function buildConfigEnv(envFile?: string): NodeJS.ProcessEnv {
+	const env: NodeJS.ProcessEnv = { ...process.env };
+	if (!envFile) return env;
+
+	for (const name of CONFIG_VARIABLES) {
+		const { present, value } = readRawSetting(name, envFile);
+		if (present) env[name] = value;
+	}
+	return env;
+}
 
 export type CheckResult = {
 	ok: boolean;
@@ -127,26 +193,13 @@ async function main() {
 	const envFile =
 		envFileIndex === -1 ? undefined : process.argv[envFileIndex + 1];
 
-	const apiKey = requireSetting("ALBERT_API_KEY", envFile);
-	const baseUrl =
-		readSetting("ALBERT_BASE_URL", envFile) ??
-		"https://albert.api.etalab.gouv.fr";
-
-	// Every variable the loader reads must come from the same source, otherwise
-	// --env-file would resolve the key but silently ignore the collection list.
-	const env: NodeJS.ProcessEnv = {
-		...process.env,
-		ALBERT_API_KEY: apiKey,
-		ALBERT_BASE_URL: baseUrl,
-	};
-	for (const name of [
-		"ALBERT_COLLECTION_IDS",
-		"ALBERT_COLLECTION_FR",
-		"ALBERT_COLLECTION_EN",
-	] as const) {
-		const value = readSetting(name, envFile);
-		if (value !== undefined) env[name] = value;
+	// Resolve the key the same way the ingestion scripts do, so a missing
+	// credential fails with an actionable message rather than a schema dump.
+	if (!process.env.ALBERT_API_KEY && !envFile) {
+		requireSetting("ALBERT_API_KEY", envFile);
 	}
+
+	const env = buildConfigEnv(envFile);
 
 	let config: AppConfig;
 	try {

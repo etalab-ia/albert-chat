@@ -1,7 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SearchHit } from "@/lib/albert/types";
 import type { AppConfig } from "@/lib/config";
-import { checkCollection, runCheckConfig } from "@/scripts/check-config";
+import { loadConfig } from "@/lib/config";
+import {
+	buildConfigEnv,
+	checkCollection,
+	runCheckConfig,
+} from "@/scripts/check-config";
 
 const HIT: SearchHit = {
 	method: "hybrid",
@@ -21,6 +29,16 @@ const CONFIG: AppConfig = {
 	chatModel: "gpt-oss-120b",
 	collectionIds: [30, 31],
 };
+
+/** Writes an env-style file and returns its path, cleaned up by the caller's tmpdir. */
+function fixtureEnvFile(values: Record<string, string>): string {
+	const path = join(mkdtempSync(join(tmpdir(), "check-config-")), "env.local");
+	const body = Object.entries(values)
+		.map(([key, value]) => `${key}=${value}`)
+		.join("\n");
+	writeFileSync(path, `${body}\n`);
+	return path;
+}
 
 describe("checkCollection", () => {
 	it("passes when a probe returns citable content", async () => {
@@ -125,5 +143,41 @@ describe("runCheckConfig", () => {
 
 		expect(result.ok).toBe(false);
 		expect(result.lines.join("\n")).toContain("1 collection(s) failed");
+	});
+});
+
+describe("buildConfigEnv", () => {
+	const original = { ...process.env };
+
+	afterEach(() => {
+		process.env = { ...original };
+		vi.restoreAllMocks();
+	});
+
+	it("returns the process environment untouched when no env file is given", () => {
+		process.env.ALBERT_BASE_URL = "";
+		const env = buildConfigEnv();
+		// The runtime reads this environment directly, so the check must too.
+		expect(env.ALBERT_BASE_URL).toBe("");
+		expect(() => loadConfig(env)).toThrow(/ALBERT_BASE_URL/);
+	});
+
+	it("keeps an explicitly empty variable from the env file", () => {
+		const env = buildConfigEnv(
+			fixtureEnvFile({ ALBERT_BASE_URL: "", ALBERT_COLLECTION_IDS: "30" }),
+		);
+
+		expect(env.ALBERT_BASE_URL).toBe("");
+		// /api/chat would reject this deployment, so the check must as well.
+		expect(() => loadConfig(env)).toThrow(/ALBERT_BASE_URL/);
+	});
+
+	it("leaves an omitted variable to the loader's own default", () => {
+		const env = buildConfigEnv(
+			fixtureEnvFile({ ALBERT_COLLECTION_IDS: "30", ALBERT_API_KEY: "sk-x" }),
+		);
+
+		expect(env.ALBERT_BASE_URL).toBeUndefined();
+		expect(loadConfig(env).baseUrl).toBe("https://albert.api.etalab.gouv.fr");
 	});
 });
