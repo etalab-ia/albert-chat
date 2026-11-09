@@ -16,9 +16,18 @@ export type AnswerBlock =
 /** A run of text that may carry citation markers, ready to render inline. */
 export type AnswerSpan =
 	| { kind: "text"; text: string }
-	| { kind: "citation"; marker: number; page: number | null; url: string };
+	| {
+			kind: "citation";
+			marker: number;
+			page: number | null;
+			url: string | null;
+	  };
 
-export type AnswerSource = { marker: number; url: string; page: number | null };
+export type AnswerSource = {
+	marker: number;
+	url: string | null;
+	page: number | null;
+};
 
 export function parseAnswer(raw: string): AnswerBlock[] {
 	const text = raw

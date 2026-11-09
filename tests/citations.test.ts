@@ -47,16 +47,21 @@ describe("buildCitationUrl", () => {
 });
 
 describe("toCitations", () => {
-	it("drops hits without a source URL", () => {
+	it("keeps hits without a source URL as excerpt-only citations", () => {
 		const citations = toCitations([
-			hit({ id: 1, metadata: { page: 1 } }),
+			hit({ id: 1, metadata: { page: 1, title: "Note interne" } }),
 			hit({
 				id: 2,
 				metadata: { source_url: "https://example.org/a.pdf", page: 2 },
 			}),
 		]);
-		expect(citations).toHaveLength(1);
-		expect(citations[0].url).toBe("https://example.org/a.pdf#page=2");
+		expect(citations).toHaveLength(2);
+		expect(citations[0]).toMatchObject({
+			title: "Note interne",
+			page: 1,
+			url: null,
+		});
+		expect(citations[1].url).toBe("https://example.org/a.pdf#page=2");
 	});
 
 	it("deduplicates the same document page and keeps the best score", () => {
@@ -96,11 +101,40 @@ describe("toCitations", () => {
 		expect(citations[0].url).toBe("https://example.org/a.pdf");
 	});
 
-	it("falls back to a generic title", () => {
+	it.each([2.5, 0, -2, true])(
+		"does not invent a page from invalid provenance: %j",
+		(page) => {
+			const citations = toCitations([
+				hit({ metadata: { page, title: "Note" } }),
+			]);
+			expect(citations[0].page).toBeNull();
+			expect(citations[0].url).toBeNull();
+		},
+	);
+
+	it("falls back to a stable document identifier", () => {
 		const citations = toCitations([
 			hit({ metadata: { source_url: "https://example.org/a.pdf", page: 1 } }),
 		]);
-		expect(citations[0].title).toBe("Document ANSSI");
+		expect(citations[0].title).toBe("Document 20");
+	});
+
+	it("prefers the generic title and page provenance over legacy fields", () => {
+		const citations = toCitations([
+			hit({
+				metadata: {
+					title: "Procédure projet",
+					guide_title: "Ancien titre",
+					page_number: 8,
+					page: 2,
+				},
+			}),
+		]);
+		expect(citations[0]).toMatchObject({
+			title: "Procédure projet",
+			page: 8,
+			url: null,
+		});
 	});
 });
 
@@ -142,9 +176,34 @@ describe("buildContextBlocks", () => {
 		expect(blocks[0].content.length).toBeLessThanOrEqual(1200);
 	});
 
-	it("skips hits whose metadata has no source URL", () => {
-		const blocks = buildContextBlocks([hit({ metadata: { page: 3 } })]);
-		expect(blocks).toHaveLength(0);
+	it("keeps URL-less content in the grounded context", () => {
+		const blocks = buildContextBlocks([
+			hit({ content: "passage interne", metadata: { page: 3 } }),
+		]);
+		expect(blocks).toHaveLength(1);
+		expect(blocks[0].content).toBe("passage interne");
+		expect(blocks[0].citation).toMatchObject({ page: 3, url: null });
+	});
+
+	it("merges URL-less chunks only when they share page provenance", () => {
+		const blocks = buildContextBlocks([
+			hit({ id: 1, content: "premier", metadata: { page: 3 } }),
+			hit({ id: 2, content: "second", metadata: { page: 3 } }),
+			hit({ id: 3, content: "autre page", metadata: { page: 4 } }),
+		]);
+		expect(blocks).toHaveLength(2);
+		expect(blocks[0].content).toContain("premier");
+		expect(blocks[0].content).toContain("second");
+	});
+
+	it("does not truncate unrelated chunks whose page is unknown", () => {
+		const blocks = buildContextBlocks([
+			hit({ id: 1, content: "premier", metadata: { title: "Note" } }),
+			hit({ id: 2, content: "second", metadata: { title: "Note" } }),
+		]);
+		expect(blocks).toHaveLength(2);
+		expect(blocks.map((block) => block.content)).toEqual(["premier", "second"]);
+		expect(blocks.every((block) => block.citation.url === null)).toBe(true);
 	});
 
 	it("merges two chunks from the same page into one block", () => {
@@ -185,13 +244,17 @@ describe("buildContextBlocks", () => {
 });
 
 describe("citation URL guards", () => {
-	it("drops a chunk whose source URL is not an absolute http(s) URL", () => {
+	it("strips an unsafe source URL without dropping the chunk", () => {
 		const citations = toCitations([
-			hit({ id: 1, metadata: { source_url: "javascript:alert(1)", page: 1 } }),
+			hit({
+				id: 1,
+				metadata: { source_url: "javascript:alert(1)", page: 1 },
+			}),
 			hit({ id: 2, metadata: { source_url: "https://e.org/ok.pdf", page: 2 } }),
 		]);
-		expect(citations).toHaveLength(1);
-		expect(citations[0].url).toBe("https://e.org/ok.pdf#page=2");
+		expect(citations).toHaveLength(2);
+		expect(citations[0].url).toBeNull();
+		expect(citations[1].url).toBe("https://e.org/ok.pdf#page=2");
 	});
 
 	it("keeps a fragment that already contains a hash", () => {

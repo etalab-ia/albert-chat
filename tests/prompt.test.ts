@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { ContextBlock } from "@/lib/rag/citations";
-import { buildChatMessages, buildContextMessage } from "@/lib/rag/prompt";
+import {
+	buildChatMessages,
+	buildContextMessage,
+	SYSTEM_PROMPT,
+} from "@/lib/rag/prompt";
 
 const BLOCK: ContextBlock = {
 	marker: "[1]",
@@ -15,6 +19,13 @@ const BLOCK: ContextBlock = {
 };
 
 describe("buildContextMessage", () => {
+	it("uses corpus-neutral grounding wording", () => {
+		expect(SYSTEM_PROMPT).not.toContain("ANSSI");
+		expect(buildContextMessage([BLOCK])).toContain(
+			"Extraits du corpus documentaire:",
+		);
+	});
+
 	it("states explicitly that no extract is available", () => {
 		expect(buildContextMessage([])).toContain("aucun");
 	});

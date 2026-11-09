@@ -8,6 +8,7 @@ import {
 const sources = new Map<number, AnswerSource>([
 	[1, { marker: 1, url: "https://e.org/a.pdf#page=4", page: 4 }],
 	[2, { marker: 2, url: "https://e.org/b.pdf", page: null }],
+	[3, { marker: 3, url: null, page: 7 }],
 ]);
 
 describe("parseSpans", () => {
@@ -53,6 +54,16 @@ describe("parseSpans", () => {
 		expect(spans).toEqual([
 			{ kind: "citation", marker: 2, page: null, url: "https://e.org/b.pdf" },
 		]);
+	});
+
+	it("keeps an excerpt-only citation without a URL", () => {
+		const spans = parseSpans("Voir [3].", sources);
+		expect(spans).toContainEqual({
+			kind: "citation",
+			marker: 3,
+			page: 7,
+			url: null,
+		});
 	});
 
 	it("returns the whole text when there is no marker", () => {

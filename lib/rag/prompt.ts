@@ -2,7 +2,7 @@ import type { ChatMessage } from "@/lib/albert/types";
 import { LIMITS } from "@/lib/config";
 import type { ContextBlock } from "./citations";
 
-export const SYSTEM_PROMPT = `Tu es un assistant documentaire de l'ANSSI intégré à une page intranet.
+export const SYSTEM_PROMPT = `Tu es un assistant documentaire intégré à une page intranet.
 
 Règles:
 - Réponds uniquement à partir des extraits fournis. Si les extraits ne contiennent pas l'information, dis-le explicitement et n'invente rien.
@@ -26,7 +26,7 @@ export function buildContextMessage(blocks: ContextBlock[]): string {
 		return `${block.marker} ${location}\n${block.content}`;
 	});
 
-	return `Extraits du corpus ANSSI:\n\n${sections.join("\n\n")}`;
+	return `Extraits du corpus documentaire:\n\n${sections.join("\n\n")}`;
 }
 
 type IncomingMessage = { role: "user" | "assistant"; content: string };

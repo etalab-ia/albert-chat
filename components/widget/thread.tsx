@@ -37,7 +37,7 @@ function useAnswerSources(): ReadonlyMap<number, AnswerSource> {
 			}
 			index.set(source.marker, {
 				marker: source.marker,
-				url: source.url,
+				url: source.url.length > 0 ? source.url : null,
 				page: source.page ?? null,
 			});
 		}
@@ -300,6 +300,19 @@ function InlineText({
 
 				const where =
 					span.page === null ? "le document cité" : `la page ${span.page}`;
+
+				if (span.url === null) {
+					return (
+						<span
+							key={`citation:${span.marker}:excerpt:${index}`}
+							title={`Source ${span.marker}, ${where}`}
+							className="ml-0.5 inline-flex items-center rounded-sm bg-[#000091]/8 px-1 text-[11.5px] font-medium text-[#000091]"
+						>
+							<span className="sr-only">{`Source ${span.marker}, ${where}`}</span>
+							<span aria-hidden="true">{span.marker}</span>
+						</span>
+					);
+				}
 
 				return (
 					<a

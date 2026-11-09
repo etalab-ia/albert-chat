@@ -58,7 +58,9 @@ export function citationsToParts(citations: Citation[]): ContentPart[] {
 		type: "source" as const,
 		sourceType: "url" as const,
 		id: citation.id,
-		url: citation.url,
+		// assistant-ui models every source as a URL part. An empty URL is the
+		// adapter's excerpt-only representation; the renderer never makes it a link.
+		url: citation.url ?? "",
 		page: citation.page,
 		marker: index + 1,
 		title:
