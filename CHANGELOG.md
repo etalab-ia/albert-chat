@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.4.0](https://github.com/etalab-ia/chat-widget/compare/chat-widget-v0.3.0...chat-widget-v0.4.0) (2026-11-09)
+
+
+### Features
+
+* add an FDE onboarding guide and read-only config check ([30c33fe](https://github.com/etalab-ia/chat-widget/commit/30c33fee89630a48ee15b02abe2e961bd641aea9))
+* add an FDE onboarding guide and read-only config check ([e571dde](https://github.com/etalab-ia/chat-widget/commit/e571dde9fcf1e2aad16d4457159a751cc564c89b))
+* support externally provisioned collections ([119fdb1](https://github.com/etalab-ia/chat-widget/commit/119fdb13411c1e8c32ee52c1d0b3e604f6976ddb))
+* support externally provisioned collections ([722cfa8](https://github.com/etalab-ia/chat-widget/commit/722cfa8ad5590dc6b21d7193f261bd7041174206))
+
+
+### Bug Fixes
+
+* **deps:** override minimatch to 11.0.4 (CVE-2026-118764 / code-scanning [#4](https://github.com/etalab-ia/chat-widget/issues/4)) ([173c928](https://github.com/etalab-ia/chat-widget/commit/173c9285c5325089d5ef7fda7207ca8f50363e59))
+* **deps:** override minimatch to 11.0.4 to close GHSA-g3hv-75wg-m249 ([fdd4b65](https://github.com/etalab-ia/chat-widget/commit/fdd4b650ed5411cbd9d9163a7e3e0e2f89dd0678))
+* **deps:** stop grouping major updates together ([73dba2e](https://github.com/etalab-ia/chat-widget/commit/73dba2ef8eaef2cddd1453ce1d1bf732e82cf251))
+* judge collection health by the runtime's context criteria ([2d84db6](https://github.com/etalab-ia/chat-widget/commit/2d84db6613b42879e1612780ee35332c4ca6ab1c))
+* validate legacy collection variables only as a fallback ([6da3fe5](https://github.com/etalab-ia/chat-widget/commit/6da3fe55563571f6bd152e4e6ca7b9781ed02455))
+* validate the check against the runtime's real environment ([6fe003e](https://github.com/etalab-ia/chat-widget/commit/6fe003eddc99572337328a7cf3679e49faa41280))
+
 ## [0.3.0](https://github.com/etalab-ia/chat-widget/compare/chat-widget-v0.2.0...chat-widget-v0.3.0) (2026-11-06)
 
 
