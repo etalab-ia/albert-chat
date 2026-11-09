@@ -16,7 +16,8 @@
 		"test:browser": "playwright test",
 		"ingest": "tsx scripts/ingest-anssi.ts",
 		"sync:anssi-fr": "tsx scripts/sync-anssi-fr.ts",
-		"verify:corpus": "tsx scripts/verify-corpus.ts"
+		"verify:corpus": "tsx scripts/verify-corpus.ts",
+		"check:config": "tsx scripts/check-config.ts"
 	},
 	"dependencies": {
 		"@assistant-ui/react": "0.15.32",

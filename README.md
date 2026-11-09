@@ -61,7 +61,8 @@ La page `/` simule une page intranet et charge le widget depuis `/embed`. La pag
 | `pnpm test`          | tests Vitest                                                    |
 | `pnpm ingest`        | indexation initiale additive du corpus ANSSI                    |
 | `pnpm sync:anssi-fr` | synchronisation incrémentale de la collection française         |
-| `pnpm verify:corpus` | vérifie citations et numéros de page                            |
+| `pnpm verify:corpus` | vérifie citations et numéros de page du corpus ANSSI            |
+| `pnpm check:config`  | vérifie en lecture seule la configuration et les collections    |
 
 ## Indexation du corpus
 
@@ -103,6 +104,52 @@ La synchronisation identifie chaque PDF par le couple `guide_id` et `source_url`
 - Une erreur de téléchargement, d'extraction, d'OCR ou d'indexation conserve l'ancienne version du guide concerné. Le bilan signale chaque échec et la commande se termine en erreur.
 
 Le workflow `anssi-sync.yml` exécute cette commande chaque jour à 04:17 UTC et sérialise les exécutions. Il ne redéploie pas le widget. Une exécution manuelle depuis l'onglet Actions utilise le mode simulation par défaut ; décocher `dry_run` permet une synchronisation réelle. Le secret GitHub Actions `ALBERT_API_KEY` est requis.
+
+## Projet métier : collections propres
+
+Cette section s'adresse à un projet qui déploie le widget sur son propre corpus. L'ingestion reste **hors de ce dépôt** : les scripts qui préparent les documents vivent dans le dépôt du projet. Le widget ne fait que rechercher dans les collections qu'on lui indique.
+
+Tout ce qui précède sur l'ANSSI décrit le démonstrateur et son pipeline ; ce n'est pas un prérequis pour un projet métier.
+
+### Ce que le projet fournit
+
+1. Une ou plusieurs collections dans l'API Albert, alimentées par ses propres scripts.
+2. Une clé `ALBERT_API_KEY` côté serveur, propre au projet.
+3. Les identifiants de ces collections, dans `ALBERT_COLLECTION_IDS`.
+4. Un hébergement Next.js et, si le widget est intégré à une page hôte, `EMBED_ALLOWED_PARENTS` et `WIDGET_ALLOWED_ORIGINS`.
+
+### Contrat attendu sur les chunks
+
+Le widget lit la métadonnée de chaque chunk. Seul le contenu est obligatoire.
+
+| Champ         | Statut     | Effet                                                                                                                                  |
+| ------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `title`       | recommandé | Titre affiché pour la source. À défaut, `guide_title` (ANSSI) puis `Document <id>`.                                                    |
+| `source_url`  | optionnel  | Lien cliquable, uniquement s'il s'agit d'une URL absolue `http(s)`. Un lien absent ou invalide n'empêche pas la citation.              |
+| `page_number` | optionnel  | Numéro de page affiché et ajouté au fragment `#page=` du lien. Valeur entière strictement positive. `page` reste accepté pour l'ANSSI. |
+
+Un chunk sans `source_url` reste utilisable : il alimente la réponse et s'affiche comme citation sans lien. Les documents sans pagination fiable doivent donc omettre `page_number` plutôt que d'inventer un numéro.
+
+Les chunks qui partagent une même page sont regroupés en une seule citation. Un chunk sans numéro de page n'est jamais regroupé, afin qu'aucun passage ne soit tronqué.
+
+### Vérifier la configuration
+
+```bash
+# Lit les variables de l'environnement
+pnpm check:config
+
+# Ou depuis un fichier, sans exposer la clé sur la ligne de commande
+pnpm check:config -- --env-file .env.production
+```
+
+La commande valide la configuration avec le même code que le widget, puis vérifie que la clé atteint chaque collection et qu'elle renvoie du contenu citable. Elle est strictement en lecture seule : elle n'appelle que `/v1/search`, sans création, modification ni suppression. Elle échoue si la configuration est invalide, si la clé est refusée ou si une collection ne renvoie rien.
+
+### Points à décider avant la mise en ligne
+
+- **Public visé.** Le widget n'a pas d'authentification : toute personne qui connaît l'URL peut interroger le corpus, dans la limite des plafonds. Le rendre public est une décision de publication, pas un effet de bord du déploiement.
+- **Clé dédiée.** Utiliser une clé propre au projet plutôt qu'une clé personnelle, et ne jamais l'exposer au navigateur.
+- **Mise à jour du corpus.** Les documents peuvent changer sans redéployer le widget. En revanche, changer la liste des collections ou les variables d'environnement demande un redéploiement.
+- **Liste vide.** Une liste de collections vide est refusée au démarrage : l'API Albert interpréterait une liste vide comme « toutes les collections accessibles ».
 
 ## Déploiement
 

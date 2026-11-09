@@ -1,0 +1,183 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { SearchHit } from "@/lib/albert/types";
+import type { AppConfig } from "@/lib/config";
+import { loadConfig } from "@/lib/config";
+import {
+	buildConfigEnv,
+	checkCollection,
+	runCheckConfig,
+} from "@/scripts/check-config";
+
+const HIT: SearchHit = {
+	method: "hybrid",
+	score: 0.7,
+	chunk: {
+		id: 1,
+		collection_id: 30,
+		document_id: 1,
+		content: "contenu",
+		metadata: { title: "Doc", page: 2, source_url: "https://e.org/a.pdf" },
+	},
+};
+
+const CONFIG: AppConfig = {
+	apiKey: "sk-test",
+	baseUrl: "https://albert.example",
+	chatModel: "gpt-oss-120b",
+	collectionIds: [30, 31],
+};
+
+/** Writes an env-style file and returns its path, cleaned up by the caller's tmpdir. */
+function fixtureEnvFile(values: Record<string, string>): string {
+	const path = join(mkdtempSync(join(tmpdir(), "check-config-")), "env.local");
+	const body = Object.entries(values)
+		.map(([key, value]) => `${key}=${value}`)
+		.join("\n");
+	writeFileSync(path, `${body}\n`);
+	return path;
+}
+
+describe("checkCollection", () => {
+	it("passes when a probe returns citable content", async () => {
+		const search = vi.fn().mockResolvedValue([HIT]);
+		const result = await checkCollection({ search, collectionId: 30 });
+
+		expect(result.ok).toBe(true);
+		expect(result.lines[0]).toContain("3/3 probes returned citable excerpts");
+		expect(result.lines.join("\n")).toContain("1 linkable, 1 with a page");
+	});
+
+	it("fails when hits carry no usable content", async () => {
+		// buildContextBlocks drops blank chunks, so the widget would receive no
+		// context even though the collection returns hits.
+		const search = vi
+			.fn()
+			.mockResolvedValue([{ ...HIT, chunk: { ...HIT.chunk, content: "   " } }]);
+		const result = await checkCollection({ search, collectionId: 30 });
+
+		expect(result.ok).toBe(false);
+		expect(result.lines[0]).toContain("no probe returned usable excerpts");
+	});
+
+	it("fails when a malformed hit breaks citation building", async () => {
+		const search = vi
+			.fn()
+			.mockResolvedValue([{ ...HIT, chunk: undefined } as never]);
+		const result = await checkCollection({ search, collectionId: 30 });
+
+		expect(result.ok).toBe(false);
+	});
+
+	it("counts only probes the runtime can actually ground on", async () => {
+		// One usable probe out of three must not read as a full success.
+		const search = vi
+			.fn()
+			.mockResolvedValueOnce([HIT])
+			.mockResolvedValue([{ ...HIT, chunk: { ...HIT.chunk, content: "" } }]);
+		const result = await checkCollection({ search, collectionId: 30 });
+
+		expect(result.ok).toBe(true);
+		expect(result.lines[0]).toContain("1/3 probes");
+	});
+
+	it("fails when every probe is empty", async () => {
+		const search = vi.fn().mockResolvedValue([]);
+		const result = await checkCollection({ search, collectionId: 30 });
+
+		expect(result.ok).toBe(false);
+		expect(result.lines[0]).toContain("no probe returned usable excerpts");
+	});
+
+	it("reports the upstream error when the credential is rejected", async () => {
+		const search = vi
+			.fn()
+			.mockRejectedValue(new Error("Albert POST /v1/search failed with 401"));
+		const result = await checkCollection({ search, collectionId: 30 });
+
+		expect(result.ok).toBe(false);
+		expect(result.lines[0]).toContain("failed with 401");
+	});
+
+	it("scopes the probe to the single collection under test", async () => {
+		const search = vi.fn().mockResolvedValue([HIT]);
+		await checkCollection({ search, collectionId: 31 });
+
+		for (const call of search.mock.calls) {
+			expect(call[0].collectionIds).toEqual([31]);
+		}
+	});
+});
+
+describe("runCheckConfig", () => {
+	it("checks every configured collection and always uses search only", async () => {
+		const search = vi.fn().mockResolvedValue([HIT]);
+		const createClient = vi.fn().mockReturnValue({ search });
+
+		const result = await runCheckConfig(CONFIG, createClient);
+
+		expect(result.ok).toBe(true);
+		expect(createClient).toHaveBeenCalledTimes(1);
+		// The read-only guarantee: the client surface used is `search` alone.
+		expect(search).toHaveBeenCalled();
+		for (const call of search.mock.calls) {
+			expect(Object.keys(call[0]).sort()).toEqual([
+				"collectionIds",
+				"limit",
+				"method",
+				"query",
+			]);
+		}
+		expect(result.lines[0]).toContain("2 collection(s) -> 30, 31");
+	});
+
+	it("fails the run when any collection is empty", async () => {
+		const search = vi.fn(
+			async ({ collectionIds }: { collectionIds: number[] }) =>
+				collectionIds[0] === 30 ? [HIT] : [],
+		);
+
+		const result = await runCheckConfig(CONFIG, () => ({ search }));
+
+		expect(result.ok).toBe(false);
+		expect(result.lines.join("\n")).toContain("1 collection(s) failed");
+	});
+});
+
+describe("buildConfigEnv", () => {
+	const original = { ...process.env };
+
+	afterEach(() => {
+		process.env = { ...original };
+		vi.restoreAllMocks();
+	});
+
+	it("returns the process environment untouched when no env file is given", () => {
+		process.env.ALBERT_BASE_URL = "";
+		const env = buildConfigEnv();
+		// The runtime reads this environment directly, so the check must too.
+		expect(env.ALBERT_BASE_URL).toBe("");
+		expect(() => loadConfig(env)).toThrow(/ALBERT_BASE_URL/);
+	});
+
+	it("keeps an explicitly empty variable from the env file", () => {
+		const env = buildConfigEnv(
+			fixtureEnvFile({ ALBERT_BASE_URL: "", ALBERT_COLLECTION_IDS: "30" }),
+		);
+
+		expect(env.ALBERT_BASE_URL).toBe("");
+		// /api/chat would reject this deployment, so the check must as well.
+		expect(() => loadConfig(env)).toThrow(/ALBERT_BASE_URL/);
+	});
+
+	it("leaves an omitted variable to the loader's own default", () => {
+		const env = buildConfigEnv(
+			fixtureEnvFile({ ALBERT_COLLECTION_IDS: "30", ALBERT_API_KEY: "sk-x" }),
+		);
+
+		expect(env.ALBERT_BASE_URL).toBeUndefined();
+		expect(loadConfig(env).baseUrl).toBe("https://albert.api.etalab.gouv.fr");
+	});
+});
