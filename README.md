@@ -66,7 +66,7 @@ Les autres variables, dont celles qui règlent l'intégration dans une page hôt
 
 ## Démonstrateur en ligne
 
-Le démonstrateur ANSSI tourne sur Scaleway : https://chatwidgetf4e894a6-chat-widget.functions.fnc.fr-par.scw.cloud/
+Le démonstrateur ANSSI tourne sur Scaleway : https://albertchatc237ce14-albert-chat.functions.fnc.fr-par.scw.cloud/
 
 Il illustre les deux modes d'intégration. La page de démonstration permet de basculer entre l'iframe et le Web Component, affiche l'extrait correspondant et remplace le widget actif. Changer de mode réinitialise la conversation.
 
