@@ -68,13 +68,13 @@ Variables :
 | ------------------- | ----------------------------------- | --------------------------------------------- |
 | `SCW_CONTAINER_ID`  | conteneur à mettre à jour           | celui du démonstrateur ANSSI                  |
 | `SCW_NAMESPACE_ID`  | espace de conteneurs                | celui du démonstrateur ANSSI                  |
-| `SCW_IMAGE_BASE`    | chemin d'image complet, sans le tag | `rg.fr-par.scw.cloud/chat-widget/chat-widget` |
+| `SCW_IMAGE_BASE`    | chemin d'image complet, sans le tag | `rg.fr-par.scw.cloud/albert-chat/albert-chat` |
 | `SCW_REGISTRY_HOST` | hôte du registre                    | `rg.fr-par.scw.cloud`                         |
 | `SCW_REGION`        | région Scaleway                     | `fr-par`                                      |
 
 Chaque variable a pour repli la valeur du démonstrateur, pour que ce dépôt continue de se déployer sans configuration supplémentaire. **Sur un fork, renseigner les cinq variables.** Sans elles, le déploiement s'arrête à l'étape « Verify the Scaleway project and container », dont le message évoque les identifiants alors que le problème est l'identifiant du conteneur. L'étape « Check Scaleway configuration » affiche les valeurs retenues, ce qui rend l'erreur lisible.
 
-Le chemin d'image garde `chat-widget` : il désigne l'espace de noms du registre Scaleway, indépendant du nom du dépôt GitHub. Un renommage du dépôt ne le change pas.
+Le chemin d'image `rg.fr-par.scw.cloud/albert-chat/albert-chat` désigne l'espace de noms du registre Scaleway et le dépôt d'images, indépendants du nom du dépôt GitHub. Les replis ci-dessus pointent vers les ressources du démonstrateur, qui existent : un repli laissé sur une ressource supprimée ne se voit qu'au moment où il sert, sous la forme d'un échec à l'étape « Verify the Scaleway project and container » alors que le problème est un identifiant périmé.
 
 **5. Configurer l'environnement du conteneur** : `ALBERT_API_KEY`, `ALBERT_COLLECTION_IDS`, et le cas échéant `ALBERT_BASE_URL`, `ALBERT_CHAT_MODEL`, `EMBED_ALLOWED_PARENTS`, `WIDGET_ALLOWED_ORIGINS`.
 
