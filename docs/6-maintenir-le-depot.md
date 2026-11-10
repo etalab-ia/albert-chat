@@ -59,7 +59,9 @@ gh run view --repo <proprietaire>/<depot> --json jobs \
 
 Attendre la fin de l'exécution avant de lire le résultat. La ligne `Synchronize Albert collection` doit afficher `success`. Si elle affiche `skipped`, le garde ne correspond plus. Si le workflow se termine en `success` alors que la tâche est `skipped`, c'est précisément le cas que cette vérification sert à distinguer.
 
-Les URL absolues de `CHANGELOG.md` et le `"name"` de `package.json` gardent l'ancien nom : les premières redirigent, le second est le nom du paquet npm et non celui du dépôt. Les réécrire entrerait en conflit avec release-please à chaque version.
+Les URL absolues de `CHANGELOG.md` gardent l'ancien nom : GitHub redirige l'ancien chemin, et les réécrire entrerait en conflit avec release-please à chaque version. Le `"name"` de `package.json` et le `component` de `release-please-config.json` sont passés à `albert-chat` : le premier ne sert qu'au paquet npm local (`pnpm` s'appuie sur le chemin, pas sur ce nom), le second nomme les versions suivantes.
+
+**Le renommage du `component` doit être accompagné d'un tag de continuité.** release-please retrouve la version précédente en comparant le `component` du tag à celui de la configuration : sans le tag `albert-chat-v0.6.0`, il ne reconnaît plus `chat-widget-v0.6.0`, repart de la version du manifeste sans commit de référence, et régénère tout le `CHANGELOG.md` depuis le début. Le tag de continuité a été créé sur le commit de la version 0.6.0. Les anciens tags `chat-widget-v*` restent en place et GitHub continue de servir leurs liens.
 
 Le chemin d'image `rg.fr-par.scw.cloud/chat-widget/chat-widget` et les secrets Scaleway gardent aussi l'ancien nom : ils désignent l'espace de noms du registre et le conteneur, indépendants du nom du dépôt GitHub.
 
