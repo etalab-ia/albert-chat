@@ -24,7 +24,11 @@ jobs:
     # This job only ever writes to the ANSSI corpus. On a fork it would either
     # fail noisily or, where ALBERT_API_KEY is set for the fork's own corpus,
     # succeed and index the whole ANSSI catalogue into the fork owner's tenant.
-    if: github.repository == 'etalab-ia/chat-widget'
+    #
+    # Scoped to the owner, not the full repository name: renaming the repository
+    # would otherwise make this false and the sync would stop running silently,
+    # which reads as a healthy workflow.
+    if: github.repository_owner == 'etalab-ia'
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     env:

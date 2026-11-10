@@ -197,6 +197,25 @@ Deux workflows ne concernent que le démonstrateur et n'ont pas à être activé
 
 L'élément personnalisé s'appelle `<albert-chat>` pour tous les projets : le nom ne mentionne plus un corpus particulier. Les libellés visibles (« Assistant ANSSI », les suggestions de départ) restent propres au démonstrateur et se modifient dans `components/widget/` ; un fork les adapte à son corpus.
 
+### Renommer le dépôt
+
+GitHub conserve l'identifiant du dépôt lors d'un renommage : les URL existantes redirigent, et ni le conteneur, ni le registre, ni les secrets Scaleway ne changent. Deux points demandent de l'attention.
+
+**Le garde de synchronisation se compare au propriétaire**, `github.repository_owner == 'etalab-ia'`, et non au nom complet. Comparé au nom, il deviendrait faux au renommage et la synchronisation quotidienne cesserait de s'exécuter sans erreur : une tâche ignorée ressemble à un workflow sain.
+
+**Vérifier après le renommage** plutôt que de le supposer. La conclusion du workflow ne suffit pas : une tâche ignorée par sa condition est comptée comme une réussite au niveau du workflow. Il faut interroger la tâche elle-même.
+
+```bash
+gh workflow run anssi-sync.yml -f dry_run=true
+gh run view --repo <proprietaire>/<depot> --json jobs \
+  --jq '.jobs[] | "\(.name) → \(.conclusion)"' \
+  "$(gh run list --workflow anssi-sync.yml --limit 1 --json databaseId --jq '.[0].databaseId')"
+```
+
+Attendre la fin de l'exécution avant de lire le résultat. La ligne `Synchronize Albert collection` doit afficher `success`. Si elle affiche `skipped`, le garde ne correspond plus ; si le workflow se termine en `success` alors que la tâche est `skipped`, c'est précisément le cas que cette vérification sert à distinguer.
+
+Les URL absolues de `CHANGELOG.md` et le `"name"` de `package.json` gardent l'ancien nom : les premières redirigent, le second est le nom du paquet npm et non celui du dépôt. Les réécrire entrerait en conflit avec release-please à chaque version.
+
 ### Ce que `check:config` vérifie, et ce qu'il ne vérifie pas
 
 La commande établit que la clé est acceptée, que chaque identifiant de collection existe et que les chunks renvoyés contiennent du texte citable. Elle ne dit rien de la qualité du corpus.
