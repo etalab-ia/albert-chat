@@ -76,7 +76,7 @@ jobs:
       # itself without editing this file. The fallback is this deployment's own
       # id, so nothing changes here until the variable is set. Same for the
       # namespace and the registry path. See "Déployer son propre widget" in
-      # the README for the full list.
+      # docs/2-deployer.md for the full list.
       SCW_CONTAINER_ID: ${{ vars.SCW_CONTAINER_ID || 'b9982545-2521-4a9b-ad40-653a9b6928ea' }}
       SCW_NAMESPACE_ID: ${{ vars.SCW_NAMESPACE_ID || 'f4e894a6-4667-4eb5-b430-de66adb9db06' }}
       IMAGE_BASE: ${{ vars.SCW_IMAGE_BASE || 'rg.fr-par.scw.cloud/chat-widget/chat-widget' }}
