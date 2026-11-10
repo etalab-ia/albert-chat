@@ -1,7 +1,7 @@
 # OSV-Scanner checks dependencies against the OSV vulnerability database.
 # - Pull requests fail only for vulnerabilities introduced by the change.
 # - Weekly and main-branch scans report the full inventory without blocking.
-# See https://github.com/etalab-ia/chat-widget/issues/8
+# See https://github.com/etalab-ia/albert-chat/issues/8
 
 name: OSV-Scanner
 
