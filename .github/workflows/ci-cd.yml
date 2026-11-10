@@ -77,10 +77,16 @@ jobs:
       # id, so nothing changes here until the variable is set. Same for the
       # namespace and the registry path. See "Déployer son propre widget" in
       # docs/2-deployer.md for the full list.
-      SCW_CONTAINER_ID: ${{ vars.SCW_CONTAINER_ID || 'b9982545-2521-4a9b-ad40-653a9b6928ea' }}
-      SCW_NAMESPACE_ID: ${{ vars.SCW_NAMESPACE_ID || 'f4e894a6-4667-4eb5-b430-de66adb9db06' }}
-      IMAGE_BASE: ${{ vars.SCW_IMAGE_BASE || 'rg.fr-par.scw.cloud/chat-widget/chat-widget' }}
-      IMAGE_REFERENCE: ${{ vars.SCW_IMAGE_BASE || 'rg.fr-par.scw.cloud/chat-widget/chat-widget' }}:sha-${{ github.sha }}
+      #
+      # Keep these fallbacks pointing at resources that exist. Scaleway names are
+      # immutable, so renaming them means recreating them, which changes their
+      # ids. A fallback left on a deleted id only shows up on a fork, or here if
+      # a variable is ever removed, as a confusing failure at the verification
+      # step rather than as a missing setting.
+      SCW_CONTAINER_ID: ${{ vars.SCW_CONTAINER_ID || '83d2d301-5b51-4ffe-9fd0-6ca0c18724ff' }}
+      SCW_NAMESPACE_ID: ${{ vars.SCW_NAMESPACE_ID || 'c237ce14-1eeb-4146-8007-51c3ae32d377' }}
+      IMAGE_BASE: ${{ vars.SCW_IMAGE_BASE || 'rg.fr-par.scw.cloud/albert-chat/albert-chat' }}
+      IMAGE_REFERENCE: ${{ vars.SCW_IMAGE_BASE || 'rg.fr-par.scw.cloud/albert-chat/albert-chat' }}:sha-${{ github.sha }}
       REGISTRY_HOST: ${{ vars.SCW_REGISTRY_HOST || 'rg.fr-par.scw.cloud' }}
     steps:
       - name: Check out repository
