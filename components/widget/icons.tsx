@@ -31,6 +31,28 @@ export function CloseIcon({ className }: { className?: string }) {
 	);
 }
 
+/**
+ * Open-state counterpart to `ChatIcon`. The panel opens upwards from the
+ * launcher, so a downward chevron reads as "put it back down". It is also
+ * distinct from the header's cross, which sits on screen at the same time.
+ */
+export function ChevronDownIcon({ className }: { className?: string }) {
+	return (
+		<svg
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			strokeWidth="1.8"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			className={className}
+			aria-hidden="true"
+		>
+			<path d="M6 9.5l6 6 6-6" />
+		</svg>
+	);
+}
+
 export function SendIcon({ className }: { className?: string }) {
 	return (
 		<svg

@@ -7,7 +7,7 @@ import {
 } from "@assistant-ui/react";
 import { useMemo, useState } from "react";
 import { createChatModelAdapter } from "./chat-adapter";
-import { ChatIcon, CloseIcon } from "./icons";
+import { ChatIcon, ChevronDownIcon, CloseIcon } from "./icons";
 import { WidgetThread } from "./thread";
 
 /**
@@ -43,9 +43,15 @@ export function AssistantModal({
 				<AssistantModalPrimitive.Anchor className="fixed right-4 bottom-4 z-50">
 					<AssistantModalPrimitive.Trigger
 						className="flex size-12 items-center justify-center rounded-full bg-[#000091] text-white shadow-lg transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#000091] aria-expanded:bg-[#1212ff]"
-						aria-label="Ouvrir l'assistant ANSSI"
+						aria-label={
+							open ? "Réduire l'assistant ANSSI" : "Ouvrir l'assistant ANSSI"
+						}
 					>
-						<ChatIcon className="size-5" />
+						{open ? (
+							<ChevronDownIcon className="size-5" />
+						) : (
+							<ChatIcon className="size-5" />
+						)}
 					</AssistantModalPrimitive.Trigger>
 				</AssistantModalPrimitive.Anchor>
 
