@@ -73,8 +73,12 @@
 
 		Object.assign(nextFrame.style, {
 			position: "fixed",
-			right: "16px",
-			bottom: "16px",
+			// Flush to the corner on purpose: the widget inside the frame applies
+			// its own 16px inset. Insetting the frame as well put the launcher
+			// 32px from the edge in iframe mode and 16px in web component mode,
+			// so switching integration moved the button.
+			right: "0",
+			bottom: "0",
 			width: "88px",
 			height: "88px",
 			border: "0",

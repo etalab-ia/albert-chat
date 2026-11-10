@@ -169,8 +169,10 @@ describe("embed loader", () => {
 		);
 		expect(frame.style).toMatchObject({
 			position: "fixed",
-			right: "16px",
-			bottom: "16px",
+			// Flush to the corner: the widget inside the frame applies its own
+			// 16px inset, so insetting the frame too moved the launcher.
+			right: "0",
+			bottom: "0",
 			width: "88px",
 			height: "88px",
 			border: "0",

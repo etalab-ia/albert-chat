@@ -185,6 +185,82 @@ test("mobile panel fits the viewport and still accepts typing inside Shadow DOM"
 	expect(panel.y + panel.height).toBeLessThanOrEqual(844);
 });
 
+/**
+ * The launcher must sit in the same place whichever integration a host picks.
+ * It used to be 32px from the corner in iframe mode (the loader inset the frame
+ * by 16px and the widget inset itself by another 16px) and 16px in web
+ * component mode, so switching mode visibly moved the button.
+ */
+test("launcher keeps one corner offset across both integration modes", async ({
+	page,
+}) => {
+	const viewport = { width: 1200, height: 800 };
+	await page.setViewportSize(viewport);
+	await page.goto("/");
+
+	const offset = (box: {
+		x: number;
+		y: number;
+		width: number;
+		height: number;
+	}) => ({
+		right: Math.round(viewport.width - (box.x + box.width)),
+		bottom: Math.round(viewport.height - (box.y + box.height)),
+	});
+
+	const iframeLauncher = page
+		.frameLocator("iframe[data-anssi-widget]")
+		.getByRole("button", { name: "Ouvrir l'assistant ANSSI" });
+	await expect(iframeLauncher).toBeVisible();
+	const iframeBox = await iframeLauncher.boundingBox();
+	if (!iframeBox) throw new Error("Expected a visible iframe launcher");
+	const iframeOffset = offset(iframeBox);
+
+	await page
+		.locator("label")
+		.filter({ hasText: /^Web Component$/ })
+		.click();
+	const webLauncher = page
+		.locator("albert-chat")
+		.getByRole("button", { name: "Ouvrir l'assistant ANSSI" });
+	await expect(webLauncher).toBeVisible();
+	const webBox = await webLauncher.boundingBox();
+	if (!webBox) throw new Error("Expected a visible web component launcher");
+	const webOffset = offset(webBox);
+
+	// Same 16px inset in both modes, and identical button size.
+	expect(iframeOffset).toEqual({ right: 16, bottom: 16 });
+	expect(webOffset).toEqual(iframeOffset);
+	expect(Math.round(webBox.width)).toBe(Math.round(iframeBox.width));
+});
+
+/**
+ * An open panel used to keep the closed state's chat bubble, so the launcher
+ * gave no visual hint that it now closes the panel.
+ */
+test("launcher icon and label reflect the open state", async ({ page }) => {
+	await page.goto("http://127.0.0.1:4311");
+	const widget = page.locator("albert-chat");
+	const open = widget.getByRole("button", { name: "Ouvrir l'assistant ANSSI" });
+	await expect(open).toBeVisible();
+	const closedIcon = await open.locator("svg path").getAttribute("d");
+
+	await open.click();
+	const close = widget.getByRole("button", {
+		name: "Réduire l'assistant ANSSI",
+	});
+	await expect(close).toBeVisible();
+	const openIcon = await close.locator("svg path").getAttribute("d");
+
+	// Distinct glyphs, and the icon must not be the header's cross either.
+	expect(openIcon).not.toBe(closedIcon);
+	expect(openIcon).not.toBe("M6 6l12 12M18 6L6 18");
+
+	await close.click();
+	await expect(open).toBeVisible();
+	expect(await open.locator("svg path").getAttribute("d")).toBe(closedIcon);
+});
+
 // The iframe route used to share the landing page's root layout, which loaded
 // DSFR. DSFR's unlayered `button` reset beat Tailwind's layered utilities, so
 // the launcher lost its blue background on hover (a white icon on a pale
