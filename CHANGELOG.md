@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.6.0](https://github.com/etalab-ia/chat-widget/compare/chat-widget-v0.5.0...chat-widget-v0.6.0) (2026-11-10)
+
+
+### Features
+
+* **widget:** rename the custom element to albert-chat ([2be5fdd](https://github.com/etalab-ia/chat-widget/commit/2be5fdd1c4a236f881b300f2cd418de44e074ae0))
+* **widget:** rename the custom element to albert-chat ([a29839a](https://github.com/etalab-ia/chat-widget/commit/a29839ae6a38d53e66eaf486a9100c33d3e1d0c6))
+
+
+### Bug Fixes
+
+* **ci:** scope the sync guard to the repository owner ([47f84e1](https://github.com/etalab-ia/chat-widget/commit/47f84e13986b1ba866c3c0a47710921297527a12))
+* **ci:** scope the sync guard to the repository owner ([7ef04bb](https://github.com/etalab-ia/chat-widget/commit/7ef04bbf955dc1a967eebecc7579ac504deaf8b1))
+
 ## [0.5.0](https://github.com/etalab-ia/chat-widget/compare/chat-widget-v0.4.0...chat-widget-v0.5.0) (2026-11-09)
 
 
