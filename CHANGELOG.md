@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.6.1](https://github.com/etalab-ia/albert-chat/compare/albert-chat-v0.6.0...albert-chat-v0.6.1) (2026-11-10)
+
+
+### Bug Fixes
+
+* **ci:** point the deploy fallbacks at the resources that exist ([ba50885](https://github.com/etalab-ia/albert-chat/commit/ba50885405c0a93ef808b894c11b0e02da983101))
+* **ci:** point the deploy fallbacks at the resources that exist ([0da1609](https://github.com/etalab-ia/albert-chat/commit/0da160995c7372f1160e368daf6e267d82940ebb))
+* **widget:** pin launcher to one corner and signal the open state ([9a503b5](https://github.com/etalab-ia/albert-chat/commit/9a503b536b33fa475be8d635b60068239e4bef18))
+* **widget:** pin launcher to one corner and signal the open state ([25735c3](https://github.com/etalab-ia/albert-chat/commit/25735c34f98a5c781c0ca45eeedc9afe83dcee7e))
+
 ## [0.6.0](https://github.com/etalab-ia/chat-widget/compare/chat-widget-v0.5.0...chat-widget-v0.6.0) (2026-11-10)
 
 
