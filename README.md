@@ -197,6 +197,23 @@ Deux workflows ne concernent que le démonstrateur et n'ont pas à être activé
 
 L'élément personnalisé s'appelle `<albert-chat>` pour tous les projets : le nom ne mentionne plus un corpus particulier. Les libellés visibles (« Assistant ANSSI », les suggestions de départ) restent propres au démonstrateur et se modifient dans `components/widget/` ; un fork les adapte à son corpus.
 
+### Renommer le dépôt
+
+GitHub conserve l'identifiant du dépôt lors d'un renommage : les URL existantes redirigent, et ni le conteneur, ni le registre, ni les secrets Scaleway ne changent. Deux points demandent de l'attention.
+
+**Le garde de synchronisation se compare au propriétaire**, `github.repository_owner == 'etalab-ia'`, et non au nom complet. Comparé au nom, il deviendrait faux au renommage et la synchronisation quotidienne cesserait de s'exécuter sans erreur : une tâche ignorée ressemble à un workflow sain.
+
+**Vérifier après le renommage** plutôt que de le supposer :
+
+```bash
+gh workflow run anssi-sync.yml -f dry_run=true
+gh run list --workflow anssi-sync.yml --limit 1
+```
+
+La conclusion doit être `success`. Une conclusion `skipped` signifie que le garde ne correspond plus.
+
+Les URL absolues de `CHANGELOG.md` et le `"name"` de `package.json` gardent l'ancien nom : les premières redirigent, le second est le nom du paquet npm et non celui du dépôt. Les réécrire entrerait en conflit avec release-please à chaque version.
+
 ### Ce que `check:config` vérifie, et ce qu'il ne vérifie pas
 
 La commande établit que la clé est acceptée, que chaque identifiant de collection existe et que les chunks renvoyés contiennent du texte citable. Elle ne dit rien de la qualité du corpus.
