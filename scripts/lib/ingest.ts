@@ -22,6 +22,10 @@ export type IngestOutcome =
 			extraction: ExtractionMethod;
 			/** Pages with no text even after OCR; they carry no chunk. */
 			pagesWithoutText: number[];
+			/** Pages the OCR could not read; they keep their text layer. */
+			ocrFailedPages: number[];
+			/** Pages the OCR read only in part; they keep the partial text. */
+			truncatedPages: number[];
 			sourceSha256: string;
 	  }
 	| { status: "skipped"; guideId: string; reason: string }
@@ -41,7 +45,7 @@ export async function ingestSource(params: {
 	collectionId: number;
 	client: Pick<
 		AlbertClient,
-		"createDocument" | "addChunks" | "deleteDocument" | "ocr"
+		"createDocument" | "addChunks" | "deleteDocument" | "ocrPage"
 	>;
 	dryRun?: boolean;
 	/** Reuse a download made by the synchronizer's checksum comparison. */
@@ -57,12 +61,8 @@ export async function ingestSource(params: {
 		const pageCount = await countPdfPages(pdf);
 		const extracted = await extractPages({
 			pdf,
-			pdfUrl: source.pdfUrl,
 			pageCount,
-			ocr: async (url) => {
-				const response = await client.ocr({ documentUrl: url });
-				return response.pages;
-			},
+			ocr: async (page) => client.ocrPage({ image: page.image }),
 		});
 
 		const chunks = extracted.pages.flatMap((page) =>
@@ -83,6 +83,13 @@ export async function ingestSource(params: {
 			finalChunk.metadata = {
 				...finalChunk.metadata,
 				sync_complete: true,
+				// A page the OCR could not read, or read only in part, leaves the
+				// document incomplete. Recording it keeps the document eligible
+				// for the next run: without it the unchanged checksum would skip
+				// the document for good, and the page would never be retried.
+				extraction_complete:
+					extracted.ocrFailures.length === 0 &&
+					extracted.truncatedPages.length === 0,
 			};
 		}
 
@@ -103,6 +110,8 @@ export async function ingestSource(params: {
 				pages: extracted.pages.length,
 				extraction: extracted.method,
 				pagesWithoutText: extracted.emptyPages,
+				ocrFailedPages: extracted.ocrFailures,
+				truncatedPages: extracted.truncatedPages,
 				sourceSha256,
 			};
 		}
@@ -137,6 +146,8 @@ export async function ingestSource(params: {
 			pages: extracted.pages.length,
 			extraction: extracted.method,
 			pagesWithoutText: extracted.emptyPages,
+			ocrFailedPages: extracted.ocrFailures,
+			truncatedPages: extracted.truncatedPages,
 			sourceSha256,
 		};
 	} catch (error) {

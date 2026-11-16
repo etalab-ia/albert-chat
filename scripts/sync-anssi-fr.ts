@@ -45,13 +45,16 @@ function printReport(report: SyncReport, dryRun: boolean) {
 	console.log(
 		`\n${prefix}: ${report.added} ajoutés, ${report.replaced} remplacés, ` +
 			`${report.unchanged} inchangés, ${report.deleted} supprimés, ` +
-			`${report.failures.length} échecs`,
+			`${report.failures.length} échecs, ${report.warnings.length} avertissements`,
 	);
 	console.log(
 		`${report.preservedUnmanaged} documents sans métadonnées du corpus français préservés.`,
 	);
 	for (const item of report.failures) {
 		console.error(`  échec ${item.subject}: ${item.reason}`);
+	}
+	for (const item of report.warnings) {
+		console.warn(`  avertissement ${item.subject}: ${item.reason}`);
 	}
 }
 
@@ -60,6 +63,7 @@ function printSourceResult(
 	result: {
 		action: "added" | "replaced" | "unchanged" | null;
 		failures: Array<{ reason: string }>;
+		warnings: Array<{ reason: string }>;
 	},
 	dryRun: boolean,
 ) {
@@ -75,6 +79,9 @@ function printSourceResult(
 	}
 	for (const item of result.failures) {
 		console.error(`  échec ${source.guideId}: ${item.reason}`);
+	}
+	for (const item of result.warnings) {
+		console.warn(`  avertissement ${source.guideId}: ${item.reason}`);
 	}
 }
 
