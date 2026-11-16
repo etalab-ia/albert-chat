@@ -79,6 +79,8 @@ beforeEach(() => {
 		],
 		method: "mixed",
 		emptyPages: [],
+		ocrFailures: [],
+		truncatedPages: [],
 	});
 });
 
@@ -100,6 +102,8 @@ describe("ingestSource", () => {
 			pages: 2,
 			extraction: "mixed",
 			pagesWithoutText: [],
+			ocrFailedPages: [],
+			truncatedPages: [],
 			sourceSha256: checksumPdf(Buffer.from("%PDF-1.7\ntest\n")),
 		});
 		expect(calls.created).toEqual([{ name: "guide.pdf", collectionId: 7 }]);
@@ -157,6 +161,61 @@ describe("ingestSource", () => {
 		}
 	});
 
+	it("marks the extraction incomplete when a page could not be read", async () => {
+		extractMock.extractPages.mockResolvedValue({
+			pages: [
+				{ page: 1, text: "a".repeat(400), extraction: "pdf" },
+				{ page: 2, text: "Titre de section", extraction: "pdf" },
+			],
+			method: "pdf",
+			emptyPages: [],
+			ocrFailures: [2],
+			truncatedPages: [],
+		});
+		const { client, calls } = fakeClient();
+
+		await ingestSource({ source: SOURCE, collectionId: 7, client });
+
+		// The PDF bytes will not change, so this marker is the only thing that
+		// brings the missing page back on a later run. It goes on the final
+		// chunk, the one the next run reads the document metadata from.
+		const chunks = calls.added[0].chunks;
+		expect(chunks.at(-1)?.metadata?.extraction_complete).toBe(false);
+		expect(chunks.at(0)?.metadata?.extraction_complete).toBeUndefined();
+	});
+
+	it("marks the extraction incomplete when a page was read in part", async () => {
+		extractMock.extractPages.mockResolvedValue({
+			pages: [
+				{ page: 1, text: "a".repeat(400), extraction: "pdf" },
+				{ page: 2, text: "# Début de page", extraction: "ocr" },
+			],
+			method: "mixed",
+			emptyPages: [],
+			ocrFailures: [],
+			truncatedPages: [2],
+		});
+		const { client, calls } = fakeClient();
+
+		await ingestSource({ source: SOURCE, collectionId: 7, client });
+
+		// A prefix of a page is not the page: the document must come back on the
+		// next run, exactly as it does when a page could not be read at all.
+		expect(calls.added[0].chunks.at(-1)?.metadata?.extraction_complete).toBe(
+			false,
+		);
+	});
+
+	it("marks the extraction complete when every page was read", async () => {
+		const { client, calls } = fakeClient();
+
+		await ingestSource({ source: SOURCE, collectionId: 7, client });
+
+		expect(calls.added[0].chunks.at(-1)?.metadata?.extraction_complete).toBe(
+			true,
+		);
+	});
+
 	it("marks the final chunk of the final batch complete, not an earlier batch", async () => {
 		extractMock.extractPages.mockResolvedValue({
 			pages: Array.from({ length: 65 }, (_, index) => ({
@@ -166,6 +225,8 @@ describe("ingestSource", () => {
 			})),
 			method: "pdf",
 			emptyPages: [],
+			ocrFailures: [],
+			truncatedPages: [],
 		});
 		const { client, calls } = fakeClient();
 
@@ -225,6 +286,8 @@ describe("ingestSource", () => {
 			pages: [],
 			method: "pdf",
 			emptyPages: [],
+			ocrFailures: [],
+			truncatedPages: [],
 		});
 		const { client, calls } = fakeClient();
 
@@ -269,6 +332,8 @@ describe("ingestSource", () => {
 			],
 			method: "mixed",
 			emptyPages: [2],
+			ocrFailures: [],
+			truncatedPages: [],
 		});
 		const { client } = fakeClient();
 
@@ -281,6 +346,31 @@ describe("ingestSource", () => {
 		expect(outcome.status).toBe("indexed");
 		expect(outcome.status === "indexed" && outcome.pagesWithoutText).toEqual([
 			2,
+		]);
+	});
+
+	it("passes on the pages the OCR could not read, so the report can name them", async () => {
+		extractMock.extractPages.mockResolvedValue({
+			pages: [
+				{ page: 1, text: "a".repeat(400), extraction: "pdf" },
+				{ page: 2, text: "", extraction: "pdf" },
+			],
+			method: "pdf",
+			emptyPages: [2],
+			ocrFailures: [2, 5],
+			truncatedPages: [],
+		});
+		const { client } = fakeClient();
+
+		const outcome = await ingestSource({
+			source: SOURCE,
+			collectionId: 7,
+			client,
+		});
+
+		expect(outcome.status).toBe("indexed");
+		expect(outcome.status === "indexed" && outcome.ocrFailedPages).toEqual([
+			2, 5,
 		]);
 	});
 });

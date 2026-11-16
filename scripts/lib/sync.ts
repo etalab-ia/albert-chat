@@ -11,7 +11,7 @@ export type SyncClient = Pick<
 	| "createDocument"
 	| "addChunks"
 	| "deleteDocument"
-	| "ocr"
+	| "ocrPage"
 >;
 
 export type InventoryDocument = AlbertDocument & {
@@ -34,12 +34,15 @@ export type SyncReport = Record<SyncAction, number> & {
 	deleted: number;
 	preservedUnmanaged: number;
 	failures: SyncFailure[];
+	/** Non-fatal findings, such as pages the OCR could not read. */
+	warnings: SyncFailure[];
 };
 
 type SourceResult = {
 	action: SyncAction | null;
 	deleted: number;
 	failures: SyncFailure[];
+	warnings: SyncFailure[];
 };
 
 function sourceKey(guideId: string, sourceUrl: string): string {
@@ -73,6 +76,9 @@ function matchesSource(
 	return (
 		metadata?.source_sha256 === sourceSha256 &&
 		metadata.sync_complete !== false &&
+		// A document indexed with pages the OCR could not read is re-extracted on
+		// the next run: the checksum alone would keep it out of reach forever.
+		metadata.extraction_complete !== false &&
 		metadata.guide_title === source.guideTitle &&
 		metadata.collection === source.language &&
 		(metadata.updated ?? null) === (source.updated?.slice(0, 10) ?? null)
@@ -84,6 +90,32 @@ function failure(subject: string, error: unknown): SyncFailure {
 		subject,
 		reason: error instanceof Error ? error.message : String(error),
 	};
+}
+
+/**
+ * A page the OCR could not read, or read only in part, is a warning and not a
+ * failure: the page keeps what text it has, the document is still indexed, and
+ * the run must not fail for it. Both cases leave the document incomplete, so the
+ * next run retries it.
+ */
+function ocrWarnings(
+	outcome: { ocrFailedPages: number[]; truncatedPages: number[] },
+	guideId: string,
+): SyncFailure[] {
+	const warnings: SyncFailure[] = [];
+	if (outcome.ocrFailedPages.length > 0) {
+		warnings.push({
+			subject: guideId,
+			reason: `pages non lues par l'OCR: ${outcome.ocrFailedPages.join(", ")}`,
+		});
+	}
+	if (outcome.truncatedPages.length > 0) {
+		warnings.push({
+			subject: guideId,
+			reason: `pages lues partiellement, texte tronqué: ${outcome.truncatedPages.join(", ")}`,
+		});
+	}
+	return warnings;
 }
 
 async function mapWithConcurrency<T, R>(
@@ -198,6 +230,7 @@ export async function syncFrenchGuides(params: {
 					);
 					result = {
 						action: "unchanged",
+						warnings: [],
 						...cleanup,
 					};
 				} else if (dryRun) {
@@ -205,6 +238,7 @@ export async function syncFrenchGuides(params: {
 						action: previous.length > 0 ? "replaced" : "added",
 						deleted: previous.length,
 						failures: [],
+						warnings: [],
 					};
 				} else {
 					const outcome = await ingestSource({
@@ -226,6 +260,7 @@ export async function syncFrenchGuides(params: {
 											: outcome.reason,
 								},
 							],
+							warnings: [],
 						};
 					} else {
 						// Staging first keeps the previous searchable version alive when
@@ -233,6 +268,7 @@ export async function syncFrenchGuides(params: {
 						const cleanup = await deleteDocuments(client, previous, false);
 						result = {
 							action: previous.length > 0 ? "replaced" : "added",
+							warnings: ocrWarnings(outcome, source.guideId),
 							...cleanup,
 						};
 					}
@@ -242,6 +278,7 @@ export async function syncFrenchGuides(params: {
 					action: null,
 					deleted: 0,
 					failures: [failure(source.guideId, error)],
+					warnings: [],
 				};
 			}
 			params.onResult?.(source, result);
@@ -273,11 +310,13 @@ export async function syncFrenchGuides(params: {
 		deleted: staleCleanup.deleted,
 		preservedUnmanaged: inventory.length - managed.length,
 		failures: [...staleCleanup.failures],
+		warnings: [],
 	};
 	for (const result of results) {
 		if (result.action) report[result.action] += 1;
 		report.deleted += result.deleted;
 		report.failures.push(...result.failures);
+		report.warnings.push(...result.warnings);
 	}
 	return report;
 }

@@ -79,7 +79,7 @@ function fakeClient() {
 			return { id: 100 };
 		}),
 		addChunks: vi.fn(),
-		ocr: vi.fn(),
+		ocrPage: vi.fn(),
 		deleteDocument: vi.fn(async (id: number) => {
 			calls.deleted.push(id);
 			calls.order.push(`delete:${id}`);
@@ -97,6 +97,8 @@ function indexed(overrides: Record<string, unknown> = {}) {
 		pages: 1,
 		extraction: "pdf",
 		pagesWithoutText: [],
+		ocrFailedPages: [],
+		truncatedPages: [],
 		sourceSha256: checksumPdf(UPDATED_PDF),
 		...overrides,
 	};
@@ -141,8 +143,38 @@ describe("syncFrenchGuides", () => {
 		expect(mocks.ingestSource).not.toHaveBeenCalled();
 		expect(client.createDocument).not.toHaveBeenCalled();
 		expect(client.addChunks).not.toHaveBeenCalled();
-		expect(client.ocr).not.toHaveBeenCalled();
+		expect(client.ocrPage).not.toHaveBeenCalled();
 		expect(calls.deleted).toEqual([]);
+	});
+
+	it("re-extracts a document whose pages could not all be read", async () => {
+		// The bytes are unchanged, so only the metadata can notice that the
+		// previous run left a page out. Without it the page is never retried.
+		mocks.downloadPdf.mockResolvedValue(PDF);
+		const { client } = fakeClient();
+		const report = await syncFrenchGuides({
+			sources: [source()],
+			inventory: [document(1, metadata({ extraction_complete: false }))],
+			client,
+			collectionId: 7,
+		});
+
+		expect(report).toMatchObject({ replaced: 1, unchanged: 0, failures: [] });
+		expect(mocks.ingestSource).toHaveBeenCalledTimes(1);
+	});
+
+	it("keeps skipping a document the OCR read in full", async () => {
+		mocks.downloadPdf.mockResolvedValue(PDF);
+		const { client } = fakeClient();
+		const report = await syncFrenchGuides({
+			sources: [source()],
+			inventory: [document(1, metadata({ extraction_complete: true }))],
+			client,
+			collectionId: 7,
+		});
+
+		expect(report).toMatchObject({ unchanged: 1, replaced: 0, failures: [] });
+		expect(mocks.ingestSource).not.toHaveBeenCalled();
 	});
 
 	it("detects changed bytes even when URL and catalogue date are unchanged", async () => {
@@ -266,6 +298,51 @@ describe("syncFrenchGuides", () => {
 			{ subject: "guide-1", reason: "OCR indisponible" },
 		]);
 		expect(calls.deleted).toEqual([]);
+	});
+
+	it("reports pages read only in part as their own warning", async () => {
+		mocks.ingestSource.mockResolvedValue(
+			indexed({ truncatedPages: [7], ocrFailedPages: [2] }),
+		);
+		const { client } = fakeClient();
+		const report = await syncFrenchGuides({
+			sources: [source()],
+			inventory: [],
+			client,
+			collectionId: 7,
+		});
+
+		// A truncated page and an unread page are different problems — one needs
+		// a bigger budget, the other a working call — so the report names them
+		// apart instead of merging the numbers into one list.
+		expect(report).toMatchObject({ added: 1, failures: [] });
+		expect(report.warnings).toEqual([
+			{ subject: "guide-1", reason: "pages non lues par l'OCR: 2" },
+			{
+				subject: "guide-1",
+				reason: "pages lues partiellement, texte tronqué: 7",
+			},
+		]);
+	});
+
+	it("reports unread OCR pages as warnings without failing the run", async () => {
+		mocks.ingestSource.mockResolvedValue(
+			indexed({ pagesWithoutText: [2], ocrFailedPages: [2, 5] }),
+		);
+		const { client } = fakeClient();
+		const report = await syncFrenchGuides({
+			sources: [source()],
+			inventory: [],
+			client,
+			collectionId: 7,
+		});
+
+		// A page the OCR could not read leaves a document that is still worth
+		// indexing, so it must not turn the whole scheduled run red.
+		expect(report).toMatchObject({ added: 1, failures: [] });
+		expect(report.warnings).toEqual([
+			{ subject: "guide-1", reason: "pages non lues par l'OCR: 2, 5" },
+		]);
 	});
 
 	it("does not delete an old URL when the replacement at the new URL fails", async () => {
