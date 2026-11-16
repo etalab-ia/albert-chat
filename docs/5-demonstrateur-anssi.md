@@ -12,9 +12,13 @@ Ces métadonnées sont conservées à l'indexation et restituées par `/v1/searc
 
 ## Extraction du texte et OCR
 
-`pdftotext` est appelé une fois pour tout le document et son résultat est découpé sur les sauts de page. La décision de passer par l'OCR est prise page par page : une page dont la couche texte est trop pauvre est relue par l'OCR Albert (`mistral-ocr-2512`), qui renvoie du markdown page par page, tandis que les autres pages gardent leur texte d'origine. Un PDF mixte, avec certaines pages scannées, est donc indexé en entier. `extraction` vaut alors `mixed` au niveau du document, et `pdf` ou `ocr` au niveau de chaque extrait.
+`pdftotext` est appelé une fois pour tout le document et son résultat est découpé sur les sauts de page. La décision de passer par l'OCR est prise page par page : une page dont la couche texte est trop pauvre est rendue en image (200 DPI, plus grand côté ramené à 1540 px) puis relue par l'OCR Albert (`openweight-ocr`, via `/v1/chat/completions`), qui renvoie du markdown. Les autres pages gardent leur texte d'origine. Un PDF mixte, avec certaines pages scannées, est donc indexé en entier. `extraction` vaut alors `mixed` au niveau du document, et `pdf` ou `ocr` au niveau de chaque extrait.
 
-Limite : l'OCR est appelé sur le document entier dès qu'une seule page en a besoin, car l'endpoint prend l'URL du PDF et non une page. Un PDF mixte coûte donc un OCR complet. Ce coût est accepté, une page scannée oubliée étant invisible dans le corpus.
+L'OCR est appelé page par page, et non sur le document entier : une page illisible ne coûte donc que cette page. Quand une page ne peut pas être lue, elle garde sa couche texte pauvre et le guide est indexé sans elle ; le sync la signale en avertissement (`pages non lues par l'OCR: 2, 5`) sans faire échouer la tâche planifiée.
+
+Une page dont la réponse est trop longue pour le budget de sortie de l'OCR est traitée à part. L'appel est refait une fois avec un budget double (8192 jetons au lieu de 4096) ; si la réponse est encore coupée, le texte partiel est conservé et indexé, mais la page est signalée (`pages lues partiellement, texte tronqué: 7`). Dans les deux cas le document reste incomplet, donc la synchronisation suivante le reprend au lieu de le considérer comme à jour.
+
+Une page blanche est détectée avant l'appel et n'est pas envoyée au modèle. Sans ce contrôle, le modèle comble le vide par du texte inventé : la page 2, blanche, du guide sur le vote par Internet revenait sous la forme d'un gabarit de document en anglais (« Contributor A », « 123 Main St, Anytown, USA ») qui serait entré dans le corpus comme du contenu du guide. La détection est un rendu en niveaux de gris à basse résolution dont on compte les pixels sombres ; sur les 151 pages de ce guide, la page blanche mesure 0 et la page la plus claire 0,0047.
 
 ## Indexation initiale
 
@@ -49,11 +53,13 @@ pnpm sync:anssi-fr --concurrency 2
 
 La synchronisation identifie chaque PDF par le couple `guide_id` et `source_url`, car une fiche ANSSI peut contenir plusieurs documents. Elle inventorie toutes les pages de l'API Albert, puis télécharge chaque PDF du catalogue pour calculer son SHA-256 : le catalogue ne fournit pas cette empreinte. Chaque extrait porte `source_sha256` en plus des métadonnées de citation. Le dernier extrait indexé porte `sync_complete: true`, ce qui permet à l'exécution suivante de ne pas retenir une indexation interrompue. Comme Albert ne renvoie pas nécessairement cet extrait en dernier, l'inventaire parcourt les pages pour repérer ce marqueur.
 
+Ce même extrait porte `extraction_complete`, qui vaut `false` quand une page n'a pas pu être lue. Sans ce marqueur, la page manquante ne reviendrait jamais : l'empreinte du PDF n'a pas changé, donc l'exécution suivante considérerait le document comme à jour et ne retenterait rien. Un document marqué incomplet est donc réextrait à chaque exécution jusqu'à ce que toutes ses pages soient lues.
+
 Ce que fait la synchronisation selon le cas :
 
 - empreinte et métadonnées identiques : le document est conservé sans extraction de texte, OCR, découpage ni réécriture Albert
 - nouveau PDF : il est indexé
-- PDF ou titre modifié : il est réindexé dans un nouveau document, et l'ancienne version n'est supprimée qu'après l'écriture complète de la nouvelle
+- PDF ou titre modifié, ou extraction précédente incomplète : il est réindexé dans un nouveau document, et l'ancienne version n'est supprimée qu'après l'écriture complète de la nouvelle
 - document géré absent du catalogue, ou doublon : il est supprimé
 - document sans `guide_id`, `source_url` ou `collection: FR` exploitable : il est préservé
 - document historique sans empreinte : il est réindexé une première fois pour le migrer, puis laissé tel quel lors des exécutions suivantes
@@ -66,7 +72,7 @@ Le workflow `anssi-sync.yml` exécute cette commande chaque jour à 04:17 UTC et
 
 La synchronisation doit télécharger chaque PDF pour détecter un changement de contenu, mais seuls les documents modifiés sont extraits et réindexés.
 
-Les PDF scannés dépendent de la qualité de l'OCR.
+Les PDF scannés dépendent de la qualité de l'OCR. Une page très dense peut dépasser le budget de sortie du modèle et n'être indexée qu'en partie.
 
 ---
 

@@ -9,6 +9,11 @@ export type ChunkMetadata = {
 	source_sha256?: string;
 	/** Written on every new chunk; only the final chunk marks ingestion complete. */
 	sync_complete?: boolean;
+	/**
+	 * Written on the final chunk with `sync_complete`. False when a page could
+	 * not be read, which keeps the document eligible for the next sync run.
+	 */
+	extraction_complete?: boolean;
 	/** Generic page provenance; `page` remains the ANSSI compatibility field. */
 	page_number?: number;
 	page?: number;
@@ -50,11 +55,19 @@ export type ChatMessage = {
 	content: string;
 };
 
-export type OCRPage = {
-	index: number;
-	markdown?: string | null;
+/** Non-streaming completion, the shape the OCR route answers with. */
+export type ChatCompletionResponse = {
+	choices?: Array<{
+		message?: { content?: string | null };
+		finish_reason?: string | null;
+	}>;
 };
 
-export type OCRResponse = {
-	pages: OCRPage[];
+/**
+ * One page read by the OCR model. `truncated` means the completion stopped on
+ * its output budget, so `text` is the beginning of the page and not all of it.
+ */
+export type OcrPageResult = {
+	text: string | null;
+	truncated: boolean;
 };

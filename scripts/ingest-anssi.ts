@@ -222,6 +222,16 @@ async function main() {
 							`      pages sans texte: ${outcome.pagesWithoutText.join(", ")}`,
 						);
 					}
+					if (outcome.ocrFailedPages.length > 0) {
+						console.log(
+							`      pages non lues par l'OCR: ${outcome.ocrFailedPages.join(", ")}`,
+						);
+					}
+					if (outcome.truncatedPages.length > 0) {
+						console.log(
+							`      pages lues partiellement, texte tronqué: ${outcome.truncatedPages.join(", ")}`,
+						);
+					}
 				} else if (outcome.status === "skipped") {
 					console.log(
 						`  [${position}] ignoré ${outcome.guideId}: ${outcome.reason}`,
