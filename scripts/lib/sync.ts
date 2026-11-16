@@ -93,20 +93,29 @@ function failure(subject: string, error: unknown): SyncFailure {
 }
 
 /**
- * A page the OCR could not read is a warning, not a failure: the page keeps its
- * text layer, the document is still indexed, and the run must not fail for it.
+ * A page the OCR could not read, or read only in part, is a warning and not a
+ * failure: the page keeps what text it has, the document is still indexed, and
+ * the run must not fail for it. Both cases leave the document incomplete, so the
+ * next run retries it.
  */
 function ocrWarnings(
-	outcome: { ocrFailedPages: number[] },
+	outcome: { ocrFailedPages: number[]; truncatedPages: number[] },
 	guideId: string,
 ): SyncFailure[] {
-	if (outcome.ocrFailedPages.length === 0) return [];
-	return [
-		{
+	const warnings: SyncFailure[] = [];
+	if (outcome.ocrFailedPages.length > 0) {
+		warnings.push({
 			subject: guideId,
 			reason: `pages non lues par l'OCR: ${outcome.ocrFailedPages.join(", ")}`,
-		},
-	];
+		});
+	}
+	if (outcome.truncatedPages.length > 0) {
+		warnings.push({
+			subject: guideId,
+			reason: `pages lues partiellement, texte tronqué: ${outcome.truncatedPages.join(", ")}`,
+		});
+	}
+	return warnings;
 }
 
 async function mapWithConcurrency<T, R>(

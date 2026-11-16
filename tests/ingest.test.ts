@@ -80,6 +80,7 @@ beforeEach(() => {
 		method: "mixed",
 		emptyPages: [],
 		ocrFailures: [],
+		truncatedPages: [],
 	});
 });
 
@@ -102,6 +103,7 @@ describe("ingestSource", () => {
 			extraction: "mixed",
 			pagesWithoutText: [],
 			ocrFailedPages: [],
+			truncatedPages: [],
 			sourceSha256: checksumPdf(Buffer.from("%PDF-1.7\ntest\n")),
 		});
 		expect(calls.created).toEqual([{ name: "guide.pdf", collectionId: 7 }]);
@@ -168,6 +170,7 @@ describe("ingestSource", () => {
 			method: "pdf",
 			emptyPages: [],
 			ocrFailures: [2],
+			truncatedPages: [],
 		});
 		const { client, calls } = fakeClient();
 
@@ -179,6 +182,28 @@ describe("ingestSource", () => {
 		const chunks = calls.added[0].chunks;
 		expect(chunks.at(-1)?.metadata?.extraction_complete).toBe(false);
 		expect(chunks.at(0)?.metadata?.extraction_complete).toBeUndefined();
+	});
+
+	it("marks the extraction incomplete when a page was read in part", async () => {
+		extractMock.extractPages.mockResolvedValue({
+			pages: [
+				{ page: 1, text: "a".repeat(400), extraction: "pdf" },
+				{ page: 2, text: "# Début de page", extraction: "ocr" },
+			],
+			method: "mixed",
+			emptyPages: [],
+			ocrFailures: [],
+			truncatedPages: [2],
+		});
+		const { client, calls } = fakeClient();
+
+		await ingestSource({ source: SOURCE, collectionId: 7, client });
+
+		// A prefix of a page is not the page: the document must come back on the
+		// next run, exactly as it does when a page could not be read at all.
+		expect(calls.added[0].chunks.at(-1)?.metadata?.extraction_complete).toBe(
+			false,
+		);
 	});
 
 	it("marks the extraction complete when every page was read", async () => {
@@ -201,6 +226,7 @@ describe("ingestSource", () => {
 			method: "pdf",
 			emptyPages: [],
 			ocrFailures: [],
+			truncatedPages: [],
 		});
 		const { client, calls } = fakeClient();
 
@@ -261,6 +287,7 @@ describe("ingestSource", () => {
 			method: "pdf",
 			emptyPages: [],
 			ocrFailures: [],
+			truncatedPages: [],
 		});
 		const { client, calls } = fakeClient();
 
@@ -306,6 +333,7 @@ describe("ingestSource", () => {
 			method: "mixed",
 			emptyPages: [2],
 			ocrFailures: [],
+			truncatedPages: [],
 		});
 		const { client } = fakeClient();
 
@@ -330,6 +358,7 @@ describe("ingestSource", () => {
 			method: "pdf",
 			emptyPages: [2],
 			ocrFailures: [2, 5],
+			truncatedPages: [],
 		});
 		const { client } = fakeClient();
 

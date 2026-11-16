@@ -3,6 +3,7 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
+import type { OcrPageResult } from "@/lib/albert/types";
 import type { PageText } from "./chunk";
 
 const execFileAsync = promisify(execFile);
@@ -37,6 +38,12 @@ export type ExtractionResult = {
 	 * the ingestion reports them without failing the document.
 	 */
 	ocrFailures: number[];
+	/**
+	 * Thin pages the OCR read only in part: the completion hit its output budget
+	 * and the text kept is the beginning of the page. The partial text is still
+	 * indexed, and the document stays incomplete so a later run retries it.
+	 */
+	truncatedPages: number[];
 };
 
 export async function downloadPdf(url: string): Promise<Buffer> {
@@ -63,7 +70,7 @@ export async function downloadPdf(url: string): Promise<Buffer> {
 export async function extractPages(params: {
 	pdf: Buffer;
 	pageCount: number;
-	ocr: (page: { page: number; image: Buffer }) => Promise<string | null>;
+	ocr: (page: { page: number; image: Buffer }) => Promise<OcrPageResult>;
 	render?: (page: number) => Promise<Buffer | null>;
 }): Promise<ExtractionResult> {
 	const textPages = await extractWithPdftotext(params.pdf, params.pageCount);
@@ -75,11 +82,13 @@ export async function extractPages(params: {
 			method: "pdf",
 			emptyPages: [],
 			ocrFailures: [],
+			truncatedPages: [],
 		};
 	}
 
 	const recovered = new Map<number, string>();
 	const ocrFailures: number[] = [];
+	const truncatedPages: number[] = [];
 
 	await withPageRenderer(params.pdf, params.render, async (render) => {
 		for (const page of thinPages) {
@@ -95,9 +104,9 @@ export async function extractPages(params: {
 			// is not counted as a failure: there was nothing to recover.
 			if (image === null) continue;
 
-			let markdown: string | null;
+			let result: OcrPageResult;
 			try {
-				markdown = await params.ocr({ page: page.page, image });
+				result = await params.ocr({ page: page.page, image });
 			} catch {
 				// A page the OCR could not read keeps its thin text layer. The rest
 				// of the document is still worth indexing, so this is reported
@@ -105,9 +114,13 @@ export async function extractPages(params: {
 				ocrFailures.push(page.page);
 				continue;
 			}
-			const text = markdown?.trim() ?? "";
-			if (text.length > 0) recovered.set(page.page, text);
-			else ocrFailures.push(page.page);
+			const text = result.text?.trim() ?? "";
+			if (text.length > 0) {
+				recovered.set(page.page, text);
+				// A prefix of a page still holds content worth indexing. It is
+				// reported so the document is retried, not thrown away.
+				if (result.truncated) truncatedPages.push(page.page);
+			} else ocrFailures.push(page.page);
 		}
 	});
 
@@ -133,6 +146,7 @@ export async function extractPages(params: {
 			.filter((page) => page.text.trim().length === 0)
 			.map((page) => page.page),
 		ocrFailures,
+		truncatedPages,
 	};
 }
 

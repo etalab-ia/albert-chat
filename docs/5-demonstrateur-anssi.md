@@ -16,6 +16,8 @@ Ces métadonnées sont conservées à l'indexation et restituées par `/v1/searc
 
 L'OCR est appelé page par page, et non sur le document entier : une page illisible ne coûte donc que cette page. Quand une page ne peut pas être lue, elle garde sa couche texte pauvre et le guide est indexé sans elle ; le sync la signale en avertissement (`pages non lues par l'OCR: 2, 5`) sans faire échouer la tâche planifiée.
 
+Une page dont la réponse est trop longue pour le budget de sortie de l'OCR est traitée à part. L'appel est refait une fois avec un budget double (8192 jetons au lieu de 4096) ; si la réponse est encore coupée, le texte partiel est conservé et indexé, mais la page est signalée (`pages lues partiellement, texte tronqué: 7`). Dans les deux cas le document reste incomplet, donc la synchronisation suivante le reprend au lieu de le considérer comme à jour.
+
 Une page blanche est détectée avant l'appel et n'est pas envoyée au modèle. Sans ce contrôle, le modèle comble le vide par du texte inventé : la page 2, blanche, du guide sur le vote par Internet revenait sous la forme d'un gabarit de document en anglais (« Contributor A », « 123 Main St, Anytown, USA ») qui serait entré dans le corpus comme du contenu du guide. La détection est un rendu en niveaux de gris à basse résolution dont on compte les pixels sombres ; sur les 151 pages de ce guide, la page blanche mesure 0 et la page la plus claire 0,0047.
 
 ## Indexation initiale
@@ -70,7 +72,7 @@ Le workflow `anssi-sync.yml` exécute cette commande chaque jour à 04:17 UTC et
 
 La synchronisation doit télécharger chaque PDF pour détecter un changement de contenu, mais seuls les documents modifiés sont extraits et réindexés.
 
-Les PDF scannés dépendent de la qualité de l'OCR.
+Les PDF scannés dépendent de la qualité de l'OCR. Une page très dense peut dépasser le budget de sortie du modèle et n'être indexée qu'en partie.
 
 ---
 

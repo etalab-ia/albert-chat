@@ -336,9 +336,10 @@ describe("AlbertClient.ocrPage", () => {
 				apiKey: "sk-test",
 			});
 
-			await expect(client.ocrPage({ image: page })).resolves.toBe(
-				"texte de la page",
-			);
+			await expect(client.ocrPage({ image: page })).resolves.toEqual({
+				text: "texte de la page",
+				truncated: false,
+			});
 
 			const [url, init] = fetchMock.mock.calls[0];
 			expect(String(url)).toBe("https://albert.test/v1/chat/completions");
@@ -368,7 +369,82 @@ describe("AlbertClient.ocrPage", () => {
 				baseUrl: "https://albert.test",
 				apiKey: "sk-test",
 			});
-			await expect(client.ocrPage({ image: page })).resolves.toBeNull();
+			await expect(client.ocrPage({ image: page })).resolves.toEqual({
+				text: null,
+				truncated: false,
+			});
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
+	it("retries a page that overflowed the budget with room to spare", async () => {
+		const fetchMock = vi
+			.fn<typeof fetch>()
+			.mockResolvedValueOnce(
+				Response.json({
+					choices: [
+						{
+							message: { content: "# Début de page" },
+							finish_reason: "length",
+						},
+					],
+				}),
+			)
+			.mockResolvedValueOnce(
+				Response.json({
+					choices: [
+						{ message: { content: "page entière" }, finish_reason: "stop" },
+					],
+				}),
+			);
+		vi.stubGlobal("fetch", fetchMock);
+		try {
+			const client = new AlbertClient({
+				baseUrl: "https://albert.test",
+				apiKey: "sk-test",
+			});
+
+			await expect(client.ocrPage({ image: page })).resolves.toEqual({
+				text: "page entière",
+				truncated: false,
+			});
+
+			expect(fetchMock).toHaveBeenCalledTimes(2);
+			const budgets = fetchMock.mock.calls.map(
+				([, init]) => JSON.parse(String(init?.body)).max_tokens,
+			);
+			expect(budgets).toEqual([4096, 8192]);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
+	it("reports a page as truncated when the retry overflows too", async () => {
+		const truncated = () =>
+			Response.json({
+				choices: [
+					{ message: { content: "# Page sans fin" }, finish_reason: "length" },
+				],
+			});
+		const fetchMock = vi
+			.fn<typeof fetch>()
+			.mockResolvedValueOnce(truncated())
+			.mockResolvedValueOnce(truncated());
+		vi.stubGlobal("fetch", fetchMock);
+		try {
+			const client = new AlbertClient({
+				baseUrl: "https://albert.test",
+				apiKey: "sk-test",
+			});
+
+			// The partial text is still worth indexing, but it must not pass for
+			// a complete read: the ingestion retries the document on that basis.
+			await expect(client.ocrPage({ image: page })).resolves.toEqual({
+				text: "# Page sans fin",
+				truncated: true,
+			});
+			expect(fetchMock).toHaveBeenCalledTimes(2);
 		} finally {
 			vi.unstubAllGlobals();
 		}
@@ -391,7 +467,10 @@ describe("AlbertClient.ocrPage", () => {
 				apiKey: "sk-test",
 			});
 			const pending = client.ocrPage({ image: page });
-			const assertion = expect(pending).resolves.toBe("page lue");
+			const assertion = expect(pending).resolves.toEqual({
+				text: "page lue",
+				truncated: false,
+			});
 			await vi.runAllTimersAsync();
 			await assertion;
 			expect(fetchMock).toHaveBeenCalledTimes(2);

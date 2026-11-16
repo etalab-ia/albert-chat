@@ -5,6 +5,7 @@ const execFileMock = vi.hoisted(() => vi.fn());
 
 vi.mock("node:child_process", () => ({ execFile: execFileMock }));
 
+import type { OcrPageResult } from "@/lib/albert/types";
 import {
 	extractPages,
 	extractWithPdftotext,
@@ -15,6 +16,11 @@ import {
 
 const PDF = Buffer.from("%PDF-1.7\ncontenu de test\n");
 const IMAGE = Buffer.from("jpeg");
+
+/** One OCR answer. Complete unless the test says otherwise. */
+function ocrText(text: string | null, truncated = false): OcrPageResult {
+	return { text, truncated };
+}
 
 /**
  * Mimics a successful `execFile`. The mock must resolve through the callback:
@@ -267,7 +273,7 @@ describe("extractPages", () => {
 
 	it("re-reads only the pages whose text layer is unusable", async () => {
 		execFileOutputs(pagesOutput(dense, "", dense));
-		const ocr = vi.fn(async () => "texte OCR de la page 2");
+		const ocr = vi.fn(async () => ocrText("texte OCR de la page 2"));
 		const render = vi.fn(async () => IMAGE);
 
 		const result = await extractPages({
@@ -298,7 +304,7 @@ describe("extractPages", () => {
 		// The document average is high, which is exactly the case the old
 		// document-level heuristic let through.
 		execFileOutputs(pagesOutput(dense, "1", dense, dense));
-		const ocr = vi.fn(async () => "schéma légendé");
+		const ocr = vi.fn(async () => ocrText("schéma légendé"));
 
 		const result = await extractPages({
 			pdf: PDF,
@@ -319,7 +325,9 @@ describe("extractPages", () => {
 
 	it("uses OCR for every page of a scanned document", async () => {
 		execFileOutputs(pagesOutput("", ""));
-		const ocr = vi.fn(async (page: { page: number }) => `page ${page.page}`);
+		const ocr = vi.fn(async (page: { page: number }) =>
+			ocrText(`page ${page.page}`),
+		);
 
 		const result = await extractPages({
 			pdf: PDF,
@@ -335,7 +343,7 @@ describe("extractPages", () => {
 
 	it("keeps the thin text layer when OCR returns nothing for that page", async () => {
 		execFileOutputs(pagesOutput(dense, "Titre de section"));
-		const ocr = vi.fn(async () => null);
+		const ocr = vi.fn(async () => ocrText(null));
 
 		const result = await extractPages({
 			pdf: PDF,
@@ -352,6 +360,28 @@ describe("extractPages", () => {
 			extraction: "pdf",
 		});
 		expect(result.ocrFailures).toEqual([2]);
+	});
+
+	it("keeps the partial text of a page the OCR could only read in part", async () => {
+		execFileOutputs(pagesOutput(dense, "Titre de section"));
+		const ocr = vi.fn(async () => ocrText("# Début de page", true));
+
+		const result = await extractPages({
+			pdf: PDF,
+			pageCount: 2,
+			ocr,
+			render: async () => IMAGE,
+		});
+
+		// The prefix is real content, so it is indexed. It is reported so the
+		// document stays incomplete and a later run tries the page again.
+		expect(result.pages[1]).toEqual({
+			page: 2,
+			text: "# Début de page",
+			extraction: "ocr",
+		});
+		expect(result.truncatedPages).toEqual([2]);
+		expect(result.ocrFailures).toEqual([]);
 	});
 
 	it("keeps the rest of the document when OCR fails on one page", async () => {
@@ -422,7 +452,7 @@ describe("extractPages", () => {
 		// Page 2 has no text layer and the OCR answer carries nothing for it.
 		// The page produces no chunk, so it must be reported instead of vanishing.
 		execFileOutputs(pagesOutput(dense, "", dense));
-		const ocr = vi.fn(async () => "");
+		const ocr = vi.fn(async () => ocrText(""));
 
 		const result = await extractPages({
 			pdf: PDF,

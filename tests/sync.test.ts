@@ -98,6 +98,7 @@ function indexed(overrides: Record<string, unknown> = {}) {
 		extraction: "pdf",
 		pagesWithoutText: [],
 		ocrFailedPages: [],
+		truncatedPages: [],
 		sourceSha256: checksumPdf(UPDATED_PDF),
 		...overrides,
 	};
@@ -297,6 +298,31 @@ describe("syncFrenchGuides", () => {
 			{ subject: "guide-1", reason: "OCR indisponible" },
 		]);
 		expect(calls.deleted).toEqual([]);
+	});
+
+	it("reports pages read only in part as their own warning", async () => {
+		mocks.ingestSource.mockResolvedValue(
+			indexed({ truncatedPages: [7], ocrFailedPages: [2] }),
+		);
+		const { client } = fakeClient();
+		const report = await syncFrenchGuides({
+			sources: [source()],
+			inventory: [],
+			client,
+			collectionId: 7,
+		});
+
+		// A truncated page and an unread page are different problems — one needs
+		// a bigger budget, the other a working call — so the report names them
+		// apart instead of merging the numbers into one list.
+		expect(report).toMatchObject({ added: 1, failures: [] });
+		expect(report.warnings).toEqual([
+			{ subject: "guide-1", reason: "pages non lues par l'OCR: 2" },
+			{
+				subject: "guide-1",
+				reason: "pages lues partiellement, texte tronqué: 7",
+			},
+		]);
 	});
 
 	it("reports unread OCR pages as warnings without failing the run", async () => {

@@ -4,6 +4,7 @@ import type {
 	ChatMessage,
 	Chunk,
 	ChunkMetadata,
+	OcrPageResult,
 	SearchHit,
 	SearchResponse,
 } from "./types";
@@ -12,6 +13,15 @@ export type AlbertConfig = {
 	baseUrl: string;
 	apiKey: string;
 };
+
+/**
+ * Output budgets for one OCR page. 4096 is the budget the OCR guide documents
+ * and reads an ordinary page; a page that overflows it is retried once with
+ * 8192 before being reported as truncated. A 1540 px page costs about 2200
+ * prompt tokens, so both stay inside the model's 16384-token context.
+ */
+const OCR_MAX_TOKENS = 4096;
+const OCR_RETRY_MAX_TOKENS = 8192;
 
 /**
  * Minimal Albert API client. Every method here is server-only: the API key must
@@ -263,33 +273,49 @@ export class AlbertClient {
 	 * `openweight-ocr`: `/v1/ocr` only serves `mistral-ocr-2512`, which is not
 	 * available to every credential. It also takes a whole document, which makes
 	 * a single unreadable page fail every other page of that document.
+	 *
+	 * A page that overflows the output budget comes back as a prefix of itself
+	 * with `finish_reason: "length"`. The result says so rather than passing the
+	 * prefix off as the whole page, so the ingestion can keep the text it has
+	 * and still treat the page as incomplete.
 	 */
 	async ocrPage(params: {
 		image: Buffer;
 		mediaType?: string;
 		model?: string;
-	}): Promise<string | null> {
+	}): Promise<OcrPageResult> {
 		const mediaType = params.mediaType ?? "image/jpeg";
-		const body = JSON.stringify({
-			model: params.model ?? "openweight-ocr",
-			messages: [
-				{
-					role: "user",
-					content: [
-						{
-							type: "image_url",
-							image_url: {
-								url: `data:${mediaType};base64,${params.image.toString("base64")}`,
+		const body = (maxTokens: number) =>
+			JSON.stringify({
+				model: params.model ?? "openweight-ocr",
+				messages: [
+					{
+						role: "user",
+						content: [
+							{
+								type: "image_url",
+								image_url: {
+									url: `data:${mediaType};base64,${params.image.toString("base64")}`,
+								},
 							},
-						},
-					],
-				},
-			],
-			max_tokens: 4096,
-			temperature: 0.2,
-			top_p: 0.9,
-		});
-		// A busy OCR model is transient, and a page image is cheap to send again.
+						],
+					},
+				],
+				max_tokens: maxTokens,
+				temperature: 0.2,
+				top_p: 0.9,
+			});
+
+		const first = await this.completePage(body(OCR_MAX_TOKENS));
+		if (!first.truncated) return first;
+		return this.completePage(body(OCR_RETRY_MAX_TOKENS));
+	}
+
+	/**
+	 * Sends one completion, retrying a transient Albert failure. A busy OCR
+	 * model is transient, and a page image is cheap to send again.
+	 */
+	private async completePage(body: string): Promise<OcrPageResult> {
 		for (let attempt = 0; ; attempt += 1) {
 			try {
 				const response = await this.request("/v1/chat/completions", {
@@ -297,7 +323,11 @@ export class AlbertClient {
 					body,
 				});
 				const payload = (await response.json()) as ChatCompletionResponse;
-				return payload.choices?.[0]?.message?.content ?? null;
+				const choice = payload.choices?.[0];
+				return {
+					text: choice?.message?.content ?? null,
+					truncated: choice?.finish_reason === "length",
+				};
 			} catch (error) {
 				const retryable =
 					error instanceof AlbertError &&

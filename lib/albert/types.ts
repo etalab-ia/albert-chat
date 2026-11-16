@@ -57,5 +57,17 @@ export type ChatMessage = {
 
 /** Non-streaming completion, the shape the OCR route answers with. */
 export type ChatCompletionResponse = {
-	choices?: Array<{ message?: { content?: string | null } }>;
+	choices?: Array<{
+		message?: { content?: string | null };
+		finish_reason?: string | null;
+	}>;
+};
+
+/**
+ * One page read by the OCR model. `truncated` means the completion stopped on
+ * its output budget, so `text` is the beginning of the page and not all of it.
+ */
+export type OcrPageResult = {
+	text: string | null;
+	truncated: boolean;
 };

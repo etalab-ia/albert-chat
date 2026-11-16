@@ -24,6 +24,8 @@ export type IngestOutcome =
 			pagesWithoutText: number[];
 			/** Pages the OCR could not read; they keep their text layer. */
 			ocrFailedPages: number[];
+			/** Pages the OCR read only in part; they keep the partial text. */
+			truncatedPages: number[];
 			sourceSha256: string;
 	  }
 	| { status: "skipped"; guideId: string; reason: string }
@@ -81,11 +83,13 @@ export async function ingestSource(params: {
 			finalChunk.metadata = {
 				...finalChunk.metadata,
 				sync_complete: true,
-				// A page the OCR could not read leaves the document incomplete.
-				// Recording it keeps the document eligible for the next run:
-				// without it the unchanged checksum would skip the document for
-				// good, and the missing page would never be retried.
-				extraction_complete: extracted.ocrFailures.length === 0,
+				// A page the OCR could not read, or read only in part, leaves the
+				// document incomplete. Recording it keeps the document eligible
+				// for the next run: without it the unchanged checksum would skip
+				// the document for good, and the page would never be retried.
+				extraction_complete:
+					extracted.ocrFailures.length === 0 &&
+					extracted.truncatedPages.length === 0,
 			};
 		}
 
@@ -107,6 +111,7 @@ export async function ingestSource(params: {
 				extraction: extracted.method,
 				pagesWithoutText: extracted.emptyPages,
 				ocrFailedPages: extracted.ocrFailures,
+				truncatedPages: extracted.truncatedPages,
 				sourceSha256,
 			};
 		}
@@ -142,6 +147,7 @@ export async function ingestSource(params: {
 			extraction: extracted.method,
 			pagesWithoutText: extracted.emptyPages,
 			ocrFailedPages: extracted.ocrFailures,
+			truncatedPages: extracted.truncatedPages,
 			sourceSha256,
 		};
 	} catch (error) {
