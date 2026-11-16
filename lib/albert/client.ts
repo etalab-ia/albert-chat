@@ -277,7 +277,9 @@ export class AlbertClient {
 	 * A page that overflows the output budget comes back as a prefix of itself
 	 * with `finish_reason: "length"`. The result says so rather than passing the
 	 * prefix off as the whole page, so the ingestion can keep the text it has
-	 * and still treat the page as incomplete.
+	 * and still treat the page as incomplete. The page is sent again with a
+	 * larger budget, and the first answer is kept when that attempt fails or
+	 * brings back nothing.
 	 */
 	async ocrPage(params: {
 		image: Buffer;
@@ -308,7 +310,16 @@ export class AlbertClient {
 
 		const first = await this.completePage(body(OCR_MAX_TOKENS));
 		if (!first.truncated) return first;
-		return this.completePage(body(OCR_RETRY_MAX_TOKENS));
+		try {
+			const retry = await this.completePage(body(OCR_RETRY_MAX_TOKENS));
+			if (retry.text?.trim()) return retry;
+		} catch {
+			// The retry is a second chance at the whole page, not a condition for
+			// keeping the first answer: a failure here must not cost the page the
+			// prefix already read. Falling through keeps that text and leaves the
+			// page reported as partial.
+		}
+		return first;
 	}
 
 	/**

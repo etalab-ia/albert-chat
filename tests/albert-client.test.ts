@@ -420,6 +420,73 @@ describe("AlbertClient.ocrPage", () => {
 		}
 	});
 
+	it("keeps the first answer when the larger-budget retry fails", async () => {
+		const fetchMock = vi
+			.fn<typeof fetch>()
+			.mockResolvedValueOnce(
+				Response.json({
+					choices: [
+						{
+							message: { content: "# Début de page" },
+							finish_reason: "length",
+						},
+					],
+				}),
+			)
+			.mockResolvedValue(
+				Response.json({ detail: "Invalid image" }, { status: 400 }),
+			);
+		vi.stubGlobal("fetch", fetchMock);
+		try {
+			const client = new AlbertClient({
+				baseUrl: "https://albert.test",
+				apiKey: "sk-test",
+			});
+
+			// The prefix is what the page has. Losing it because the second call
+			// failed would drop a page the OCR had already read most of.
+			await expect(client.ocrPage({ image: page })).resolves.toEqual({
+				text: "# Début de page",
+				truncated: true,
+			});
+			expect(fetchMock).toHaveBeenCalledTimes(2);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
+	it("keeps the first answer when the retry comes back empty", async () => {
+		const fetchMock = vi
+			.fn<typeof fetch>()
+			.mockResolvedValueOnce(
+				Response.json({
+					choices: [
+						{
+							message: { content: "# Début de page" },
+							finish_reason: "length",
+						},
+					],
+				}),
+			)
+			.mockResolvedValueOnce(Response.json({ choices: [{ message: {} }] }));
+		vi.stubGlobal("fetch", fetchMock);
+		try {
+			const client = new AlbertClient({
+				baseUrl: "https://albert.test",
+				apiKey: "sk-test",
+			});
+
+			// An empty retry is no answer at all; the prefix still is.
+			await expect(client.ocrPage({ image: page })).resolves.toEqual({
+				text: "# Début de page",
+				truncated: true,
+			});
+			expect(fetchMock).toHaveBeenCalledTimes(2);
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
 	it("reports a page as truncated when the retry overflows too", async () => {
 		const truncated = () =>
 			Response.json({
