@@ -320,14 +320,69 @@ describe("AlbertClient document inventory", () => {
 	});
 });
 
-describe("AlbertClient.ocr", () => {
+describe("AlbertClient.ocrPage", () => {
+	const page = Buffer.from("jpeg-bytes");
+
+	it("sends one page to the documented OCR route with the guide's settings", async () => {
+		const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+			Response.json({
+				choices: [{ message: { content: "texte de la page" } }],
+			}),
+		);
+		vi.stubGlobal("fetch", fetchMock);
+		try {
+			const client = new AlbertClient({
+				baseUrl: "https://albert.test",
+				apiKey: "sk-test",
+			});
+
+			await expect(client.ocrPage({ image: page })).resolves.toBe(
+				"texte de la page",
+			);
+
+			const [url, init] = fetchMock.mock.calls[0];
+			expect(String(url)).toBe("https://albert.test/v1/chat/completions");
+			const body = JSON.parse(String(init?.body));
+			expect(body.model).toBe("openweight-ocr");
+			expect(body.messages[0].content[0]).toEqual({
+				type: "image_url",
+				image_url: { url: `data:image/jpeg;base64,${page.toString("base64")}` },
+			});
+			expect(body).toMatchObject({
+				max_tokens: 4096,
+				temperature: 0.2,
+				top_p: 0.9,
+			});
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
+	it("returns null when the model answers without content", async () => {
+		const fetchMock = vi
+			.fn<typeof fetch>()
+			.mockResolvedValue(Response.json({ choices: [{ message: {} }] }));
+		vi.stubGlobal("fetch", fetchMock);
+		try {
+			const client = new AlbertClient({
+				baseUrl: "https://albert.test",
+				apiKey: "sk-test",
+			});
+			await expect(client.ocrPage({ image: page })).resolves.toBeNull();
+		} finally {
+			vi.unstubAllGlobals();
+		}
+	});
+
 	it("retries a transient busy response and returns the successful OCR", async () => {
 		const fetchMock = vi
 			.fn<typeof fetch>()
 			.mockResolvedValueOnce(
 				Response.json({ detail: "Model is too busy" }, { status: 503 }),
 			)
-			.mockResolvedValueOnce(Response.json({ pages: [{ index: 0 }] }));
+			.mockResolvedValueOnce(
+				Response.json({ choices: [{ message: { content: "page lue" } }] }),
+			);
 		vi.stubGlobal("fetch", fetchMock);
 		vi.useFakeTimers();
 		try {
@@ -335,10 +390,8 @@ describe("AlbertClient.ocr", () => {
 				baseUrl: "https://albert.test",
 				apiKey: "sk-test",
 			});
-			const pending = client.ocr({ documentUrl: "https://example.test/a.pdf" });
-			const assertion = expect(pending).resolves.toEqual({
-				pages: [{ index: 0 }],
-			});
+			const pending = client.ocrPage({ image: page });
+			const assertion = expect(pending).resolves.toBe("page lue");
 			await vi.runAllTimersAsync();
 			await assertion;
 			expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -352,7 +405,7 @@ describe("AlbertClient.ocr", () => {
 		const fetchMock = vi
 			.fn<typeof fetch>()
 			.mockResolvedValue(
-				Response.json({ detail: "Invalid document" }, { status: 400 }),
+				Response.json({ detail: "Invalid image" }, { status: 400 }),
 			);
 		vi.stubGlobal("fetch", fetchMock);
 		try {
@@ -360,9 +413,9 @@ describe("AlbertClient.ocr", () => {
 				baseUrl: "https://albert.test",
 				apiKey: "sk-test",
 			});
-			await expect(
-				client.ocr({ documentUrl: "https://example.test/a.pdf" }),
-			).rejects.toMatchObject({ status: 400 });
+			await expect(client.ocrPage({ image: page })).rejects.toMatchObject({
+				status: 400,
+			});
 			expect(fetchMock).toHaveBeenCalledTimes(1);
 		} finally {
 			vi.unstubAllGlobals();

@@ -79,7 +79,7 @@ function fakeClient() {
 			return { id: 100 };
 		}),
 		addChunks: vi.fn(),
-		ocr: vi.fn(),
+		ocrPage: vi.fn(),
 		deleteDocument: vi.fn(async (id: number) => {
 			calls.deleted.push(id);
 			calls.order.push(`delete:${id}`);
@@ -97,6 +97,7 @@ function indexed(overrides: Record<string, unknown> = {}) {
 		pages: 1,
 		extraction: "pdf",
 		pagesWithoutText: [],
+		ocrFailedPages: [],
 		sourceSha256: checksumPdf(UPDATED_PDF),
 		...overrides,
 	};
@@ -141,7 +142,7 @@ describe("syncFrenchGuides", () => {
 		expect(mocks.ingestSource).not.toHaveBeenCalled();
 		expect(client.createDocument).not.toHaveBeenCalled();
 		expect(client.addChunks).not.toHaveBeenCalled();
-		expect(client.ocr).not.toHaveBeenCalled();
+		expect(client.ocrPage).not.toHaveBeenCalled();
 		expect(calls.deleted).toEqual([]);
 	});
 
@@ -266,6 +267,26 @@ describe("syncFrenchGuides", () => {
 			{ subject: "guide-1", reason: "OCR indisponible" },
 		]);
 		expect(calls.deleted).toEqual([]);
+	});
+
+	it("reports unread OCR pages as warnings without failing the run", async () => {
+		mocks.ingestSource.mockResolvedValue(
+			indexed({ pagesWithoutText: [2], ocrFailedPages: [2, 5] }),
+		);
+		const { client } = fakeClient();
+		const report = await syncFrenchGuides({
+			sources: [source()],
+			inventory: [],
+			client,
+			collectionId: 7,
+		});
+
+		// A page the OCR could not read leaves a document that is still worth
+		// indexing, so it must not turn the whole scheduled run red.
+		expect(report).toMatchObject({ added: 1, failures: [] });
+		expect(report.warnings).toEqual([
+			{ subject: "guide-1", reason: "pages non lues par l'OCR: 2, 5" },
+		]);
 	});
 
 	it("does not delete an old URL when the replacement at the new URL fails", async () => {

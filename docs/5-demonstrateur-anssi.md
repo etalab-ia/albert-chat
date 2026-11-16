@@ -12,9 +12,11 @@ Ces métadonnées sont conservées à l'indexation et restituées par `/v1/searc
 
 ## Extraction du texte et OCR
 
-`pdftotext` est appelé une fois pour tout le document et son résultat est découpé sur les sauts de page. La décision de passer par l'OCR est prise page par page : une page dont la couche texte est trop pauvre est relue par l'OCR Albert (`mistral-ocr-2512`), qui renvoie du markdown page par page, tandis que les autres pages gardent leur texte d'origine. Un PDF mixte, avec certaines pages scannées, est donc indexé en entier. `extraction` vaut alors `mixed` au niveau du document, et `pdf` ou `ocr` au niveau de chaque extrait.
+`pdftotext` est appelé une fois pour tout le document et son résultat est découpé sur les sauts de page. La décision de passer par l'OCR est prise page par page : une page dont la couche texte est trop pauvre est rendue en image (200 DPI, plus grand côté ramené à 1540 px) puis relue par l'OCR Albert (`openweight-ocr`, via `/v1/chat/completions`), qui renvoie du markdown. Les autres pages gardent leur texte d'origine. Un PDF mixte, avec certaines pages scannées, est donc indexé en entier. `extraction` vaut alors `mixed` au niveau du document, et `pdf` ou `ocr` au niveau de chaque extrait.
 
-Limite : l'OCR est appelé sur le document entier dès qu'une seule page en a besoin, car l'endpoint prend l'URL du PDF et non une page. Un PDF mixte coûte donc un OCR complet. Ce coût est accepté, une page scannée oubliée étant invisible dans le corpus.
+L'OCR est appelé page par page, et non sur le document entier : une page illisible ne coûte donc que cette page. Quand une page ne peut pas être lue, elle garde sa couche texte pauvre et le guide est indexé sans elle ; le sync la signale en avertissement (`pages non lues par l'OCR: 2, 5`) sans faire échouer la tâche planifiée.
+
+Une page blanche est détectée avant l'appel et n'est pas envoyée au modèle. Sans ce contrôle, le modèle comble le vide par du texte inventé : la page 2, blanche, du guide sur le vote par Internet revenait sous la forme d'un gabarit de document en anglais (« Contributor A », « 123 Main St, Anytown, USA ») qui serait entré dans le corpus comme du contenu du guide. La détection est un rendu en niveaux de gris à basse résolution dont on compte les pixels sombres ; sur les 151 pages de ce guide, la page blanche mesure 0 et la page la plus claire 0,0047.
 
 ## Indexation initiale
 

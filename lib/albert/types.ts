@@ -50,11 +50,7 @@ export type ChatMessage = {
 	content: string;
 };
 
-export type OCRPage = {
-	index: number;
-	markdown?: string | null;
-};
-
-export type OCRResponse = {
-	pages: OCRPage[];
+/** Non-streaming completion, the shape the OCR route answers with. */
+export type ChatCompletionResponse = {
+	choices?: Array<{ message?: { content?: string | null } }>;
 };

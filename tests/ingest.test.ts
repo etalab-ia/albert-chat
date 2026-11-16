@@ -79,6 +79,7 @@ beforeEach(() => {
 		],
 		method: "mixed",
 		emptyPages: [],
+		ocrFailures: [],
 	});
 });
 
@@ -100,6 +101,7 @@ describe("ingestSource", () => {
 			pages: 2,
 			extraction: "mixed",
 			pagesWithoutText: [],
+			ocrFailedPages: [],
 			sourceSha256: checksumPdf(Buffer.from("%PDF-1.7\ntest\n")),
 		});
 		expect(calls.created).toEqual([{ name: "guide.pdf", collectionId: 7 }]);
@@ -166,6 +168,7 @@ describe("ingestSource", () => {
 			})),
 			method: "pdf",
 			emptyPages: [],
+			ocrFailures: [],
 		});
 		const { client, calls } = fakeClient();
 
@@ -225,6 +228,7 @@ describe("ingestSource", () => {
 			pages: [],
 			method: "pdf",
 			emptyPages: [],
+			ocrFailures: [],
 		});
 		const { client, calls } = fakeClient();
 
@@ -269,6 +273,7 @@ describe("ingestSource", () => {
 			],
 			method: "mixed",
 			emptyPages: [2],
+			ocrFailures: [],
 		});
 		const { client } = fakeClient();
 
@@ -281,6 +286,30 @@ describe("ingestSource", () => {
 		expect(outcome.status).toBe("indexed");
 		expect(outcome.status === "indexed" && outcome.pagesWithoutText).toEqual([
 			2,
+		]);
+	});
+
+	it("passes on the pages the OCR could not read, so the report can name them", async () => {
+		extractMock.extractPages.mockResolvedValue({
+			pages: [
+				{ page: 1, text: "a".repeat(400), extraction: "pdf" },
+				{ page: 2, text: "", extraction: "pdf" },
+			],
+			method: "pdf",
+			emptyPages: [2],
+			ocrFailures: [2, 5],
+		});
+		const { client } = fakeClient();
+
+		const outcome = await ingestSource({
+			source: SOURCE,
+			collectionId: 7,
+			client,
+		});
+
+		expect(outcome.status).toBe("indexed");
+		expect(outcome.status === "indexed" && outcome.ocrFailedPages).toEqual([
+			2, 5,
 		]);
 	});
 });

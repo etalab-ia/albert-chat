@@ -1,9 +1,9 @@
 import type {
 	AlbertDocument,
+	ChatCompletionResponse,
 	ChatMessage,
 	Chunk,
 	ChunkMetadata,
-	OCRResponse,
 	SearchHit,
 	SearchResponse,
 } from "./types";
@@ -256,25 +256,48 @@ export class AlbertClient {
 		}
 	}
 
-	async ocr(params: {
-		documentUrl: string;
+	/**
+	 * Reads one page image through the OCR model.
+	 *
+	 * Albert's default OCR route is `/v1/chat/completions` with
+	 * `openweight-ocr`: `/v1/ocr` only serves `mistral-ocr-2512`, which is not
+	 * available to every credential. It also takes a whole document, which makes
+	 * a single unreadable page fail every other page of that document.
+	 */
+	async ocrPage(params: {
+		image: Buffer;
+		mediaType?: string;
 		model?: string;
-	}): Promise<OCRResponse> {
-		// A busy OCR model is transient. Retry without duplicating the document:
-		// ingestion creates its Albert document only after extraction succeeds.
+	}): Promise<string | null> {
+		const mediaType = params.mediaType ?? "image/jpeg";
+		const body = JSON.stringify({
+			model: params.model ?? "openweight-ocr",
+			messages: [
+				{
+					role: "user",
+					content: [
+						{
+							type: "image_url",
+							image_url: {
+								url: `data:${mediaType};base64,${params.image.toString("base64")}`,
+							},
+						},
+					],
+				},
+			],
+			max_tokens: 4096,
+			temperature: 0.2,
+			top_p: 0.9,
+		});
+		// A busy OCR model is transient, and a page image is cheap to send again.
 		for (let attempt = 0; ; attempt += 1) {
 			try {
-				const response = await this.request("/v1/ocr", {
+				const response = await this.request("/v1/chat/completions", {
 					method: "POST",
-					body: JSON.stringify({
-						model: params.model ?? "mistral-ocr-2512",
-						document: {
-							type: "document_url",
-							document_url: params.documentUrl,
-						},
-					}),
+					body,
 				});
-				return (await response.json()) as OCRResponse;
+				const payload = (await response.json()) as ChatCompletionResponse;
+				return payload.choices?.[0]?.message?.content ?? null;
 			} catch (error) {
 				const retryable =
 					error instanceof AlbertError &&
