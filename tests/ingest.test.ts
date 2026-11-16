@@ -159,6 +159,38 @@ describe("ingestSource", () => {
 		}
 	});
 
+	it("marks the extraction incomplete when a page could not be read", async () => {
+		extractMock.extractPages.mockResolvedValue({
+			pages: [
+				{ page: 1, text: "a".repeat(400), extraction: "pdf" },
+				{ page: 2, text: "Titre de section", extraction: "pdf" },
+			],
+			method: "pdf",
+			emptyPages: [],
+			ocrFailures: [2],
+		});
+		const { client, calls } = fakeClient();
+
+		await ingestSource({ source: SOURCE, collectionId: 7, client });
+
+		// The PDF bytes will not change, so this marker is the only thing that
+		// brings the missing page back on a later run. It goes on the final
+		// chunk, the one the next run reads the document metadata from.
+		const chunks = calls.added[0].chunks;
+		expect(chunks.at(-1)?.metadata?.extraction_complete).toBe(false);
+		expect(chunks.at(0)?.metadata?.extraction_complete).toBeUndefined();
+	});
+
+	it("marks the extraction complete when every page was read", async () => {
+		const { client, calls } = fakeClient();
+
+		await ingestSource({ source: SOURCE, collectionId: 7, client });
+
+		expect(calls.added[0].chunks.at(-1)?.metadata?.extraction_complete).toBe(
+			true,
+		);
+	});
+
 	it("marks the final chunk of the final batch complete, not an earlier batch", async () => {
 		extractMock.extractPages.mockResolvedValue({
 			pages: Array.from({ length: 65 }, (_, index) => ({

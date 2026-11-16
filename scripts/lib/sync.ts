@@ -76,6 +76,9 @@ function matchesSource(
 	return (
 		metadata?.source_sha256 === sourceSha256 &&
 		metadata.sync_complete !== false &&
+		// A document indexed with pages the OCR could not read is re-extracted on
+		// the next run: the checksum alone would keep it out of reach forever.
+		metadata.extraction_complete !== false &&
 		metadata.guide_title === source.guideTitle &&
 		metadata.collection === source.language &&
 		(metadata.updated ?? null) === (source.updated?.slice(0, 10) ?? null)

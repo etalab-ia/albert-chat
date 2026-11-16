@@ -9,6 +9,11 @@ export type ChunkMetadata = {
 	source_sha256?: string;
 	/** Written on every new chunk; only the final chunk marks ingestion complete. */
 	sync_complete?: boolean;
+	/**
+	 * Written on the final chunk with `sync_complete`. False when a page could
+	 * not be read, which keeps the document eligible for the next sync run.
+	 */
+	extraction_complete?: boolean;
 	/** Generic page provenance; `page` remains the ANSSI compatibility field. */
 	page_number?: number;
 	page?: number;

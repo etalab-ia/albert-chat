@@ -51,11 +51,13 @@ pnpm sync:anssi-fr --concurrency 2
 
 La synchronisation identifie chaque PDF par le couple `guide_id` et `source_url`, car une fiche ANSSI peut contenir plusieurs documents. Elle inventorie toutes les pages de l'API Albert, puis télécharge chaque PDF du catalogue pour calculer son SHA-256 : le catalogue ne fournit pas cette empreinte. Chaque extrait porte `source_sha256` en plus des métadonnées de citation. Le dernier extrait indexé porte `sync_complete: true`, ce qui permet à l'exécution suivante de ne pas retenir une indexation interrompue. Comme Albert ne renvoie pas nécessairement cet extrait en dernier, l'inventaire parcourt les pages pour repérer ce marqueur.
 
+Ce même extrait porte `extraction_complete`, qui vaut `false` quand une page n'a pas pu être lue. Sans ce marqueur, la page manquante ne reviendrait jamais : l'empreinte du PDF n'a pas changé, donc l'exécution suivante considérerait le document comme à jour et ne retenterait rien. Un document marqué incomplet est donc réextrait à chaque exécution jusqu'à ce que toutes ses pages soient lues.
+
 Ce que fait la synchronisation selon le cas :
 
 - empreinte et métadonnées identiques : le document est conservé sans extraction de texte, OCR, découpage ni réécriture Albert
 - nouveau PDF : il est indexé
-- PDF ou titre modifié : il est réindexé dans un nouveau document, et l'ancienne version n'est supprimée qu'après l'écriture complète de la nouvelle
+- PDF ou titre modifié, ou extraction précédente incomplète : il est réindexé dans un nouveau document, et l'ancienne version n'est supprimée qu'après l'écriture complète de la nouvelle
 - document géré absent du catalogue, ou doublon : il est supprimé
 - document sans `guide_id`, `source_url` ou `collection: FR` exploitable : il est préservé
 - document historique sans empreinte : il est réindexé une première fois pour le migrer, puis laissé tel quel lors des exécutions suivantes

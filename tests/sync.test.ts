@@ -146,6 +146,36 @@ describe("syncFrenchGuides", () => {
 		expect(calls.deleted).toEqual([]);
 	});
 
+	it("re-extracts a document whose pages could not all be read", async () => {
+		// The bytes are unchanged, so only the metadata can notice that the
+		// previous run left a page out. Without it the page is never retried.
+		mocks.downloadPdf.mockResolvedValue(PDF);
+		const { client } = fakeClient();
+		const report = await syncFrenchGuides({
+			sources: [source()],
+			inventory: [document(1, metadata({ extraction_complete: false }))],
+			client,
+			collectionId: 7,
+		});
+
+		expect(report).toMatchObject({ replaced: 1, unchanged: 0, failures: [] });
+		expect(mocks.ingestSource).toHaveBeenCalledTimes(1);
+	});
+
+	it("keeps skipping a document the OCR read in full", async () => {
+		mocks.downloadPdf.mockResolvedValue(PDF);
+		const { client } = fakeClient();
+		const report = await syncFrenchGuides({
+			sources: [source()],
+			inventory: [document(1, metadata({ extraction_complete: true }))],
+			client,
+			collectionId: 7,
+		});
+
+		expect(report).toMatchObject({ unchanged: 1, replaced: 0, failures: [] });
+		expect(mocks.ingestSource).not.toHaveBeenCalled();
+	});
+
 	it("detects changed bytes even when URL and catalogue date are unchanged", async () => {
 		const { client, calls } = fakeClient();
 		mocks.ingestSource.mockImplementationOnce(async () => {

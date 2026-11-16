@@ -81,6 +81,11 @@ export async function ingestSource(params: {
 			finalChunk.metadata = {
 				...finalChunk.metadata,
 				sync_complete: true,
+				// A page the OCR could not read leaves the document incomplete.
+				// Recording it keeps the document eligible for the next run:
+				// without it the unchanged checksum would skip the document for
+				// good, and the missing page would never be retried.
+				extraction_complete: extracted.ocrFailures.length === 0,
 			};
 		}
 
