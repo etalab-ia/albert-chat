@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.6.2](https://github.com/etalab-ia/albert-chat/compare/albert-chat-v0.6.1...albert-chat-v0.6.2) (2026-11-27)
+
+
+### Bug Fixes
+
+* **anssi:** keep the OCR prefix when the larger-budget retry fails ([0b1d028](https://github.com/etalab-ia/albert-chat/commit/0b1d02866c5651839a5f5520dc930eeca6446ea4))
+* **anssi:** read scanned pages with LightOn OCR, page by page ([d35f0cf](https://github.com/etalab-ia/albert-chat/commit/d35f0cf730f3ea50e4a5801a6dc6a6d11011aa75))
+* **anssi:** read scanned pages with LightOn OCR, page by page ([a342f23](https://github.com/etalab-ia/albert-chat/commit/a342f2317f575b5a0a8f17236ec2932387052d06))
+* **anssi:** report OCR pages that were read only in part ([b1f4a81](https://github.com/etalab-ia/albert-chat/commit/b1f4a8160acf33682eceea1fb59f489f7a4963d6))
+* **anssi:** retry documents whose pages could not all be read ([cd2c76a](https://github.com/etalab-ia/albert-chat/commit/cd2c76a9565135372957904c96019f86a6885071))
+
 ## [0.6.1](https://github.com/etalab-ia/albert-chat/compare/albert-chat-v0.6.0...albert-chat-v0.6.1) (2026-11-10)
 
 
